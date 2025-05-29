@@ -6,45 +6,34 @@ const authConfig = require("../config/auth.json");
 const sharp = require("sharp");
 
 function UsuarioController() {
-  async function visualizarUsuario(req, res) {
+  async function cadastrar(req, res) {
     try {
-      const usuarios = await usuariosRepository.listarUsuarios();
+      const { usuario, dadosMotorista } = req.body;
 
-      if (usuarios.length === 0) {
-        return res.status(404).json({ error: "Nenhum usuário encontrado" });
+      // Validação adicional pode ser feita aqui
+      if (!dadosMotorista.cnh) {
+        return res.status(400).json({ error: "CNH é obrigatória para motoristas" });
       }
 
-      const usuariosComImagem = usuarios.map((usuario) => {
-        const imageBase64 = usuario.imageData
-          ? Buffer.from(usuario.imageData).toString("base64")
-          : null;
-
-        return {
-          ...usuario.toJSON(),
-          image: imageBase64 ? `data:image/png;base64,${imageBase64}` : null,
-        };
+      const usuarioCriado = await usuariosRepository.criarUsuarioComPerfil({
+        usuario,
+        dadosMotorista
       });
 
-      res.json(usuariosComImagem);
+      res.status(201).json({
+        message: "Usuário cadastrado com sucesso",
+        usuario: {
+          usuario_id: usuarioCriado.usuario_id,
+          email: usuarioCriado.email,
+          role: usuarioCriado.role
+        }
+      });
     } catch (error) {
-      console.error("Erro ao obter usuários:", error);
-      res.status(500).json({ error: "Erro ao obter usuários" });
-    }
-  }
-
-  async function cadastrar(req, res) {
-    const { nome, email, senha } = req.body;
-    try {
-      await usuariosRepository.criarUsuario({ nome, email, senha });
-      res.json({ message: `Usuário ${nome} cadastrado com sucesso` });
-    } catch (error) {
-      console.error("Erro ao cadastrar usuário:", error);
-      res
-        .status(500)
-        .json({
-          errorMessage: "Erro ao cadastrar usuário",
-          error: error.message,
-        });
+      console.error("Erro no cadastro:", error);
+      res.status(500).json({ 
+        error: "Erro ao cadastrar usuário",
+        details: error.message 
+      });
     }
   }
 
@@ -52,50 +41,53 @@ function UsuarioController() {
     try {
       const { email, senha } = req.body;
 
-      if (!email || !senha) {
-        return res
-          .status(400)
-          .json({ message: "Email e senha são obrigatórios." });
+      const usuario = await usuariosRepository.buscarUsuarioComPerfil(email);
+      if (!usuario) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
       }
 
-      const user = await Usuario.findOne({ where: { email: email } });
-
-      if (!user) {
-        return res.status(401).json({ message: "Email não encontrado." });
+      // Verifica senha
+      const senhaValida = await bcrypt.compare(senha, usuario.senha);
+      if (!senhaValida) {
+        return res.status(401).json({ error: "Senha incorreta" });
       }
 
-      const isMatch = await bcrypt.compare(senha, user.senha);
-
-      if (!isMatch) {
-        return res.status(401).json({ message: "Senha incorreta." });
-      }
-
+      // Gera token JWT com informações do perfil
       const token = jwt.sign(
         {
-          usuario_id: user.usuario_id,
-          role: user.role,
+          usuario_id: usuario.usuario_id,
+          role: usuario.role,
+          perfil: usuario.motorista ? {
+            nome: usuario.motorista.nome,
+            cnh: usuario.motorista.cnh
+          } : null
         },
         authConfig.secret,
-        { expiresIn: 86400 }
+        { expiresIn: "24h" }
       );
 
-      res.send({ user, token });
+      // Retorna dados seguros (sem senha)
+      const resposta = {
+        usuario: {
+          usuario_id: usuario.usuario_id,
+          email: usuario.email,
+          role: usuario.role
+        },
+        motorista: usuario.motorista,
+        token
+      };
+
+      res.json(resposta);
     } catch (error) {
-      console.error("Erro ao autenticar usuário:", error);
-      res
-        .status(500)
-        .json({
-          errorMessage: "Erro ao autenticar usuário",
-          error: error.message,
-        });
+      console.error("Erro no login:", error);
+      res.status(500).json({ error: "Erro no login" });
     }
   }
 
   return {
-    visualizarUsuario,
     cadastrar,
-    logar,
+    logar
   };
 }
 
-module.exports = UsuarioController;
+module.exports = UsuarioController();

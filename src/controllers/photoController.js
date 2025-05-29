@@ -46,7 +46,7 @@ function PhotoController() {
   async function postPhoto(req, res) {
     try {
       const {
-        imovel_id,
+        motorista_id,
         imagemBase64,
       } = req.body;
   
@@ -62,7 +62,7 @@ function PhotoController() {
       console.log("AQUIIII " + JSON.stringify(imageUrl));
   
       const novoPhoto = await photoRepository.criarPhoto({
-        imovel_id,
+        motorista_id,
         imageData: imageUrl,
       });
   
@@ -76,13 +76,13 @@ function PhotoController() {
   async function deletePhoto(req, res) {
     try {
       const { id } = req.params; // ID da foto
-      const { imovel_id } = req.body; // ID do imóvel vindo do body
+      const { motorista_id } = req.body; // ID do imóvel vindo do body
   
-      if (!imovel_id) {
+      if (!motorista_id) {
         return res.status(400).json({ error: "O ID do imóvel é obrigatório." });
       }
   
-      const resultado = await photoRepository.deletarPhoto(id, imovel_id);
+      const resultado = await photoRepository.deletarPhoto(id, motorista_id);
   
       res.json(resultado);
     } catch (error) {

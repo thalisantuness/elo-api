@@ -1,46 +1,70 @@
 const { Usuario } = require('../model/Usuarios');
+const { Motorista } = require('../model/Motorista');
 const bcrypt = require('bcrypt');
 
 async function listarUsuarios() {
-  return Usuario.findAll();
+  return Usuario.findAll({
+    include: [
+      { 
+        model: Motorista, 
+        as: 'motorista',
+        attributes: { exclude: ['usuario_id'] } 
+      }
+    ]
+  });
 }
 
-async function criarUsuario(dadosUsuario) {
-    const { nome, email, senha } = dadosUsuario;
+async function criarUsuarioComPerfil(dados) {
+  const { usuario, dadosMotorista } = dados;
 
-    if (!senha) {
-        throw new Error('Senha é obrigatória');
-    }
-
-    const usuarioExistente = await Usuario.findOne({ where: { email } });
-    if (usuarioExistente) {
-        throw new Error('Usuário com este email já existe');
-    }
-
-    const senhaHash = await bcrypt.hash(senha, 10);
-
-    const usuarioNormal = await Usuario.create({
-        nome,
-        email,
-        senha: senhaHash,
-        pontos: 0
-    });
-
-    console.log(`Usuário ${nome} criado com sucesso`);
-
-    return usuarioNormal;
-}
-
-async function buscarUsuario(email) {
-  const usuario = await Usuario.findOne({ where: { email } });
-  if (!usuario) {
-    throw new Error('Usuário não encontrado');
+  // Validação básica
+  if (!usuario.email || !usuario.senha) {
+    throw new Error('Email e senha são obrigatórios');
   }
-  return usuario;
+
+  // Verifica se usuário já existe
+  const usuarioExistente = await Usuario.findOne({ where: { email: usuario.email } });
+  if (usuarioExistente) {
+    throw new Error('Email já cadastrado');
+  }
+
+  // Cria usuário com transaction para garantir atomicidade
+  return sequelize.transaction(async (t) => {
+    const usuarioCriado = await Usuario.create({
+      email: usuario.email,
+      senha: await bcrypt.hash(usuario.senha, 10),
+      role: 'motorista', // Define role conforme necessário
+      nome: dadosMotorista.nome // Nome pode vir do perfil
+    }, { transaction: t });
+
+    // Cria perfil de motorista
+    await Motorista.create({
+      usuario_id: usuarioCriado.usuario_id,
+      ...dadosMotorista
+    }, { transaction: t });
+
+    return usuarioCriado;
+  });
+}
+
+async function buscarUsuarioComPerfil(email) {
+  return Usuario.findOne({ 
+    where: { email },
+    include: [
+      { 
+        model: Motorista, 
+        as: 'motorista',
+        include: [
+          { model: ContaBancaria, as: 'conta_bancaria' },
+          { model: ReferenciaPessoal, as: 'referencia-pessoal' }
+        ]
+      }
+    ]
+  });
 }
 
 module.exports = {
   listarUsuarios,
-  criarUsuario,
-  buscarUsuario
+  criarUsuarioComPerfil,
+  buscarUsuarioComPerfil
 };
