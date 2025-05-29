@@ -1,10 +1,10 @@
-const imovelRepository = require("../repositories/imovelRepository");
+const motoristaRepository = require("../repositories/motoristaRepository");
 const sharp = require("sharp");
 const s3 = require("../utils/awsConfig");
 const { v4: uuidv4 } = require("uuid");
 
-function ImovelController() {
-  async function getImovel(req, res) {
+function MotoristaController() {
+  async function getMotorista(req, res) {
     try {
       const { tipo_id, cidade_id, n_quartos, n_banheiros, n_vagas, estado_id } =
         req.query;
@@ -18,7 +18,7 @@ function ImovelController() {
       if (n_vagas) filtros.n_vagas = n_vagas;
       if (estado_id) filtros.estado_id = estado_id;
 
-      const imoveis = await imovelRepository.listarImovel(filtros);
+      const imoveis = await motoristaRepository.listarMotorista(filtros);
 
       if (imoveis.length === 0) {
         return res
@@ -53,7 +53,7 @@ function ImovelController() {
     return result.Location;
   }
 
-  async function postImovel(req, res) {
+  async function postMotorista(req, res) {
     try {
       const {
         nome,
@@ -79,7 +79,7 @@ function ImovelController() {
 
       console.log("AQUIIII " + JSON.stringify(imageUrl));
 
-      const novoImovel = await imovelRepository.criarImovel({
+      const novoMotorista = await motoristaRepository.criarMotorista({
         nome,
         description,
         valor,
@@ -95,7 +95,7 @@ function ImovelController() {
 
       res.json({
         message: `Imóvel ${nome} cadastrado com sucesso!`,
-        imovel: novoImovel,
+        motorista: novoMotorista,
       });
     } catch (error) {
       console.error("Erro ao cadastrar imóvel:", error);
@@ -103,21 +103,21 @@ function ImovelController() {
     }
   }
 
-  async function getImovelById(req, res) {
+  async function getMotoristaById(req, res) {
     try {
       const { id } = req.params;
-      const imovel = await imovelRepository.buscarImovelPorId(id);
+      const motorista = await motoristaRepository.buscarMotoristaPorId(id);
 
-      if (!imovel) {
+      if (!motorista) {
         return res.status(404).json({ error: "Imóvel não encontrado" });
       }
 
-      const imageBase64 = imovel.imageData
-        ? Buffer.from(imovel.imageData).toString("base64")
+      const imageBase64 = motorista.imageData
+        ? Buffer.from(motorista.imageData).toString("base64")
         : null;
 
       res.json({
-        ...imovel.toJSON(),
+        ...motorista.toJSON(),
         image: imageBase64 ? `data:image/png;base64,${imageBase64}` : null,
       });
     } catch (error) {
@@ -126,7 +126,7 @@ function ImovelController() {
     }
   }
 
-  async function putImovel(req, res) {
+  async function putMotorista(req, res) {
     try {
       const { id } = req.params;
       const {
@@ -160,14 +160,14 @@ function ImovelController() {
         dadosAtualizados.imageData = await compressImage(imagemBase64);
       }
 
-      const imovelAtualizado = await imovelRepository.atualizarImovel(
+      const motoristaAtualizado = await motoristaRepository.atualizarMotorista(
         id,
         dadosAtualizados
       );
 
       res.json({
         message: "Imóvel atualizado com sucesso!",
-        imovel: imovelAtualizado,
+        motorista: motoristaAtualizado,
       });
     } catch (error) {
       console.error("Erro ao atualizar imóvel:", error);
@@ -175,14 +175,14 @@ function ImovelController() {
     }
   }
 
-  async function deleteImovel(req, res) {
+  async function deleteMotorista(req, res) {
     try {
       const { id } = req.params;
 
-      const imagens = await imovelRepository.buscarImagensPorImovelId(id);
+      const imagens = await motoristaRepository.buscarImagensPorMotoristaId(id);
 
       for (const imagem of imagens) {
-        await imovelRepository.deletarImagem(imagem.photo_id);
+        await motoristaRepository.deletarImagem(imagem.photo_id);
 
         const key = imagem.imageData.split(".com/")[1];
         const params = { Bucket: process.env.AWS_BUCKET_NAME, Key: key };
@@ -190,7 +190,7 @@ function ImovelController() {
         await s3.deleteObject(params).promise();
       }
 
-      await imovelRepository.deletarImovel(id);
+      await motoristaRepository.deletarMotorista(id);
 
       res.json({ message: "Imóvel e imagens excluídos com sucesso!" });
     } catch (error) {
@@ -200,12 +200,12 @@ function ImovelController() {
   }
 
   return {
-    getImovel,
-    postImovel,
-    getImovelById,
-    putImovel,
-    deleteImovel,
+    getMotorista,
+    postMotorista,
+    getMotoristaById,
+    putMotorista,
+    deleteMotorista,
   };
 }
 
-module.exports = ImovelController;
+module.exports = MotoristaController;

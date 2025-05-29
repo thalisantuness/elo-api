@@ -1,11 +1,11 @@
-const { Imovel } = require("../model/Imovel");
+const { Motorista } = require("../model/Motorista");
 const { Estado } = require("../model/Estado");
 const { Tipo } = require("../model/Tipo");
 const { Photo } = require("../model/Photo");
 const { Cidade } = require("../model/Cidade");
 
-async function listarImovel(filtros = {}) {
-  return await Imovel.findAll({
+async function listarMotorista(filtros = {}) {
+  return await Motorista.findAll({
     where: filtros,
     include: [
       { model: Estado, as: "estado", attributes: ["estado_id", "nome"] },
@@ -16,8 +16,8 @@ async function listarImovel(filtros = {}) {
   });
 }
 
-async function buscarImovelPorId(id) {
-  const imovel = await Imovel.findByPk(id, {
+async function buscarMotoristaPorId(id) {
+  const motorista = await Motorista.findByPk(id, {
     include: [
       { model: Estado, as: "estado", attributes: ["estado_id", "nome"] },
       { model: Cidade, as: "cidade", attributes: ["cidade_id", "nome"] },
@@ -26,31 +26,31 @@ async function buscarImovelPorId(id) {
     ],
   });
 
-  if (!imovel) {
+  if (!motorista) {
     throw new Error("Imóvel não encontrado");
   }
 
-  return imovel;
+  return motorista;
 }
 
-async function criarImovel(dadosImovel) {
-  return await Imovel.create(dadosImovel);
+async function criarMotorista(dadosMotorista) {
+  return await Motorista.create(dadosMotorista);
 }
 
-async function atualizarImovel(id, dadosAtualizados) {
-  const imovel = await Imovel.findByPk(id);
+async function atualizarMotorista(id, dadosAtualizados) {
+  const motorista = await Motorista.findByPk(id);
 
-  if (!imovel) {
+  if (!motorista) {
     throw new Error("Imóvel não encontrado");
   }
 
-  await imovel.update(dadosAtualizados);
-  return imovel;
+  await motorista.update(dadosAtualizados);
+  return motorista;
 }
 
-async function buscarImagensPorImovelId(imovelId) {
+async function buscarImagensPorMotoristaId(motoristaId) {
   return await Photo.findAll({
-    where: { imovel_id: imovelId },
+    where: { motorista_id: motoristaId },
     attributes: ["photo_id", "imageData"],
   });
 }
@@ -66,29 +66,29 @@ async function deletarImagem(photoId) {
   return { message: "Imagem deletada com sucesso" };
 }
 
-async function deletarImovel(id) {
-  const imovel = await Imovel.findByPk(id, {
+async function deletarMotorista(id) {
+  const motorista = await Motorista.findByPk(id, {
     include: [{ model: Photo, as: "photos" }],
   });
 
-  if (!imovel) {
+  if (!motorista) {
     throw new Error("Imóvel não encontrado");
   }
 
-  if (imovel.photos.length > 0) {
-    await Photo.destroy({ where: { imovel_id: id } });
+  if (motorista.photos.length > 0) {
+    await Photo.destroy({ where: { motorista_id: id } });
   }
 
-  await imovel.destroy();
+  await motorista.destroy();
   return { message: "Imóvel deletado com sucesso" };
 }
 
 module.exports = {
-  listarImovel,
-  criarImovel,
-  buscarImovelPorId,
-  atualizarImovel,
-  deletarImovel,
-  buscarImagensPorImovelId,
+  listarMotorista,
+  criarMotorista,
+  buscarMotoristaPorId,
+  atualizarMotorista,
+  deletarMotorista,
+  buscarImagensPorMotoristaId,
   deletarImagem,
 };
