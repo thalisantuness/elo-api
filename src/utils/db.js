@@ -1,21 +1,21 @@
 const { Sequelize } = require("sequelize");
 require("dotenv").config();
 
-const sequelize = new Sequelize(
-  process.env.DB_NAME,
-  process.env.PGUSER,
-  process.env.PGPASSWORD,
-  process.env.PGDATABASE,
-  {
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false,
-      },
+const sequelize = new Sequelize({
+  database: process.env.PGDATABASE || "railway",
+  username: process.env.PGUSER || "postgres",
+  password: process.env.PGPASSWORD, // Obrigatório
+  host: process.env.PGHOST || "postgres.railway.internal",
+  port: process.env.PGPORT || 5432,
+  dialect: "postgres", // Agora explícito e obrigatório
+  dialectOptions: {
+    ssl: {
+      require: true,
+      rejectUnauthorized: false,
     },
-    logging: console.log,
-  }
-);
+  },
+  logging: console.log,
+});
 
 sequelize
   .authenticate()
