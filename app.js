@@ -12,7 +12,7 @@ app.use(bodyParser.json({ limit: '900mb' }));
 app.use(cors());
 app.use('/', routes);
 
-sequelize.sync()
+sequelize.sync({ force: true})
   .then(() => {
     console.log('Modelos sincronizados com o banco de dados');
   })
