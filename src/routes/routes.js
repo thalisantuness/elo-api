@@ -1,6 +1,12 @@
 const express = require("express");
 const router = express.Router();
 router.use(express.json());
+const { Usuario } = require('../model/Usuarios')
+const { ContaBancaria } = require('../model/ContaBancaria')
+const { Motorista } = require('../model/Motorista')
+const { ReferenciaPessoal } = require('../model/ReferenciaPessoal')
+const { ReferenciaTransportadora } = require('../model/ReferenciaTransportadora')
+
 
 // const UsuarioController = require("../controllers/usuariosController");
 // const MotoristaController = require("../controllers/motoristaController");

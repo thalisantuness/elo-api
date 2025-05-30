@@ -1,4 +1,4 @@
-const { Sequelize, DataTypes } = require("sequelize");
+const { Sequelize } = require("sequelize");
 const sequelize = require("../utils/db");
 // const { ReferenciaPessoal } = require("./ReferenciaPessoal");
 // const { ReferenciaTransportadora } = require("./ReferenciaTransportadora");

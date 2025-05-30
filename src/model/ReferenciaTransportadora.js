@@ -5,7 +5,7 @@ const sequelize = require("../utils/db");
 const ReferenciaTransportadora = sequelize.define(
   "ReferenciaTransportadora",
   {
-    referenciatransp_id: {
+    referenciatransportadora_id: {
       type: Sequelize.INTEGER,
       primaryKey: true,
       autoIncrement: true,
