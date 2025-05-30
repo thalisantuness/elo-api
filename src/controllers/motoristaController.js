@@ -1,7 +1,5 @@
 const motoristaRepository = require("../repositories/motoristaRepository");
-const sharp = require("sharp");
-const s3 = require("../utils/awsConfig");
-const { v4: uuidv4 } = require("uuid");
+const bcrypt = require("bcrypt");
 
 function MotoristaController() {
   async function getMotorista(req, res) {
@@ -53,55 +51,56 @@ function MotoristaController() {
     return result.Location;
   }
 
-  async function postMotorista(req, res) {
-    try {
-      const {
-        nome,
-        description,
-        valor,
-        valor_condominio,
-        n_quartos,
-        n_banheiros,
-        n_vagas,
-        tipo_id,
-        cidade_id,
-        estado_id,
-        imagemBase64,
-      } = req.body;
+ async function postMotorista(req, res) {
+  try {
+    const { 
+      usuario, 
+      dadosMotorista, 
+      referenciasPessoais = [], 
+      referenciasTransportadoras = [], 
+      contaBancaria,
+      imagemBase64 
+    } = req.body;
 
-      const imagemBuffer = Buffer.from(imagemBase64.split(",")[1], "base64");
-
-      const imagemComprimida = await compressImage(imagemBuffer);
-
-      const uniqueFileName = `${uuidv4()}.jpg`;
-
-      const imageUrl = await uploadToS3(imagemComprimida, uniqueFileName);
-
-      console.log("AQUIIII " + JSON.stringify(imageUrl));
-
-      const novoMotorista = await motoristaRepository.criarMotorista({
-        nome,
-        description,
-        valor,
-        valor_condominio,
-        n_quartos,
-        n_banheiros,
-        n_vagas,
-        tipo_id,
-        cidade_id,
-        estado_id,
-        imageData: imageUrl,
+    // Validações
+    if (!referenciasPessoais.length || !contaBancaria) {
+      return res.status(400).json({ 
+        error: 'Referências pessoais e conta bancária são obrigatórias' 
       });
-
-      res.json({
-        message: `Imóvel ${nome} cadastrado com sucesso!`,
-        motorista: novoMotorista,
-      });
-    } catch (error) {
-      console.error("Erro ao cadastrar imóvel:", error);
-      res.status(500).json({ error: "Erro ao cadastrar imóvel" });
     }
+
+    // Hash da senha
+    const senhaHash = await bcrypt.hash(usuario.senha, 10);
+
+    const resultado = await motoristaRepository.criarMotoristaCompleto({
+      usuario: {
+        ...usuario,
+        senha: senhaHash
+      },
+      dadosMotorista,
+      referenciasPessoais,
+      referenciasTransportadoras,
+      contaBancaria,
+      imagemBase64
+    });
+
+    res.status(201).json({
+      message: 'Motorista cadastrado com sucesso!',
+      usuario: {
+        usuario_id: resultado.usuario.usuario_id,
+        email: resultado.usuario.email,
+        role: resultado.usuario.role
+      },
+      motorista: resultado.motorista
+    });
+  } catch (error) {
+    console.error('Erro ao cadastrar motorista:', error);
+    res.status(500).json({ 
+      error: 'Erro ao cadastrar motorista',
+      details: error.message 
+    });
   }
+}
 
   async function getMotoristaById(req, res) {
     try {

@@ -8,8 +8,8 @@ const { ReferenciaPessoal } = require('../model/ReferenciaPessoal')
 const { ReferenciaTransportadora } = require('../model/ReferenciaTransportadora')
 
 
-// const UsuarioController = require("../controllers/usuariosController");
-// const MotoristaController = require("../controllers/motoristaController");
+const MotoristaController = require("../controllers/motoristaController");
+const motoristaController = MotoristaController();
 // const EstadoController = require("../controllers/estadoController");
 // const CidadeController = require("../controllers/cidadeController");
 // const TipoController = require("../controllers/tipoController"); 
@@ -56,7 +56,7 @@ const { ReferenciaTransportadora } = require('../model/ReferenciaTransportadora'
 // router.post('/photo', photoController.postPhoto); 
 // router.delete('/photo/:id', photoController.deletePhoto);
 
-
+router.post('/motoristas', motoristaController.postMotorista);
 // router.use(authMiddleware);
 
 router.use('*', (req, res) => {

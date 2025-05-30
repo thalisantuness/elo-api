@@ -1,6 +1,6 @@
 const { Sequelize } = require("sequelize");
 const sequelize = require("../utils/db");
-// const { Motorista } = require("./Motorista");
+const { Motorista } = require("./Motorista");
 
 const ReferenciaTransportadora = sequelize.define(
   "ReferenciaTransportadora",
@@ -10,14 +10,14 @@ const ReferenciaTransportadora = sequelize.define(
       primaryKey: true,
       autoIncrement: true,
     },
-    // motorista_id: {
-    //   type: Sequelize.INTEGER,
-    //   allowNull: false,
-    //   references: {
-    //     model: Motorista,
-    //     key: "motorista_id",
-    //   },
-    // },
+    motorista_id: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      references: {
+        model: Motorista,
+        key: "motorista_id",
+      },
+    },
     nome: {
       type: Sequelize.STRING,
       allowNull: false,
@@ -34,9 +34,5 @@ const ReferenciaTransportadora = sequelize.define(
   }
 );
 
-// ReferenciaTransportadora.belongsTo(Motorista, {
-//   foreignKey: "motorista_id",
-//   as: "motorista",
-// });
 
 module.exports = { ReferenciaTransportadora };

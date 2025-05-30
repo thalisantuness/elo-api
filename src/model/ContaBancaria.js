@@ -1,6 +1,6 @@
 const { Sequelize } = require("sequelize");
 const sequelize = require("../utils/db");
-// const { Motorista } = require("./Motorista");
+const { Motorista } = require("./Motorista");
 
 const ContaBancaria = sequelize.define(
   "ContaBancaria",
@@ -10,15 +10,15 @@ const ContaBancaria = sequelize.define(
       primaryKey: true,
       autoIncrement: true,
     },
-    // motorista_id: {
-    //   type: Sequelize.INTEGER,
-    //   allowNull: false,
-    //   unique: true,
-    //   references: {
-    //     model: Motorista,
-    //     key: "motorista_id",
-    //   },
-    // },
+    motorista_id: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      unique: true,
+      references: {
+        model: Motorista,
+        key: "motorista_id",
+      },
+    },
     banco: {
       type: Sequelize.STRING,
       allowNull: false,
@@ -51,9 +51,5 @@ const ContaBancaria = sequelize.define(
   }
 );
 
-// ContaBancaria.belongsTo(Motorista, {
-//   foreignKey: "motorista_id",
-//   as: "motorista",
-// });
 
 module.exports = { ContaBancaria };

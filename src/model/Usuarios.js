@@ -1,6 +1,6 @@
 const { Sequelize } = require("sequelize");
 const sequelize = require("../utils/db");
-// const { Motorista } = require("./Motorista");
+const { Motorista } = require("./Motorista");
 
 
 const Usuario = sequelize.define(
@@ -13,7 +13,7 @@ const Usuario = sequelize.define(
     },
     nome: {
       type: Sequelize.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     email: {
       type: Sequelize.STRING,
@@ -45,9 +45,9 @@ const Usuario = sequelize.define(
   }
 );
 
-// Usuario.hasOne(Motorista, {
-//   foreignKey: "usuario_id",
-//   as: "motorista",
-// });
+Usuario.hasOne(Motorista, {
+  foreignKey: "usuario_id",
+  as: "motorista",
+});
 
 module.exports = { Usuario };
