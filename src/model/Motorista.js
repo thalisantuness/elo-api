@@ -37,27 +37,27 @@ const Motorista = sequelize.define(
 
     antt: {
       type: Sequelize.STRING,
-      allowNull: false,
+      allowNull: true,
     },
 
     cnh: {
       type: Sequelize.STRING,
-      allowNull: false,
+      allowNull: true,
     },
 
     cp_residencia: {
       type: Sequelize.STRING,
-      allowNull: false,
+      allowNull: true,
     },
 
     doc_dono_caminhao: {
       type: Sequelize.STRING,
-      allowNull: false,
+      allowNull: true,
     },
 
     cp_residencia_dono_caminhao: {
       type: Sequelize.STRING,
-      allowNull: false,
+      allowNull: true,
     },
 
     usuario_id: {
