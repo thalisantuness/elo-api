@@ -4,68 +4,95 @@ const jwt = require("jsonwebtoken");
 const authConfig = require("../config/auth.json");
 
 function UsuarioController() {
-
-async function cadastrar(req, res) {
+  async function cadastrar(req, res) {
     try {
-        // Extrai os campos de imagens separadamente
-        const { 
-            imagem_perfil,
-            comprovante_residencia_motorista,
-            documento_dono_caminhao,
-            comprovante_residencia_dono_caminhao,
-            ...usuarioData
-        } = req.body;
+      // Extrai os campos de imagens separadamente
+      const { 
+        imagem_perfil,
+        comprovante_residencia_motorista,
+        documento_dono_caminhao,
+        comprovante_residencia_dono_caminhao,
+        antt,
+        cnh,
+        placa_1,
+        placa_2,
+        placa_3,
+        celular,
+        ...usuarioData
+      } = req.body;
 
-        // Prepara o objeto de documentos para upload
-        const documentos = {
-            comprovante_residencia_motorista,
-            documento_dono_caminhao,
-            comprovante_residencia_dono_caminhao
-        };
+      // Prepara o objeto de documentos para upload
+      const documentos = {
+        comprovante_residencia_motorista,
+        documento_dono_caminhao,
+        comprovante_residencia_dono_caminhao,
+        antt,
+        cnh,
+        placa_1,
+        placa_2,
+        placa_3
+      };
 
-        // Validações básicas
-        if (!usuarioData.email || !usuarioData.senha || !usuarioData.role) {
-            return res.status(400).json({ error: "Email, senha e role são obrigatórios" });
+      // Validações básicas
+      if (!usuarioData.email || !usuarioData.senha || !usuarioData.role || !celular) {
+        return res.status(400).json({ error: "Email, senha, role e celular são obrigatórios" });
+      }
+
+      // Verifica se usuário já existe
+      const usuarioExistente = await usuariosRepository.buscarUsuarioPorEmail(usuarioData.email);
+      if (usuarioExistente) {
+        return res.status(400).json({ error: "Email já cadastrado" });
+      }
+
+      // Validações específicas por role
+      if (usuarioData.role === "motorista") {
+        if (!antt || !cnh || !comprovante_residencia_motorista || !documento_dono_caminhao || !comprovante_residencia_dono_caminhao) {
+          return res.status(400).json({ error: "ANNT, CNH, comprovante de residência do motorista, documento do dono do caminhão e comprovante de residência do dono do caminhão são obrigatórios para motoristas" });
         }
-
-        // Verifica se usuário já existe
-        const usuarioExistente = await usuariosRepository.buscarUsuarioPorEmail(usuarioData.email);
-        if (usuarioExistente) {
-            return res.status(400).json({ error: "Email já cadastrado" });
+        if (usuarioData.numero_placas >= 1 && !placa_1) {
+          return res.status(400).json({ error: "Imagem da placa 1 é obrigatória quando o número de placas é 1 ou mais" });
         }
-
-        // Validações específicas por role
-        if (usuarioData.role === "motorista") {
-            if (!usuarioData.cnh) {
-                return res.status(400).json({ error: "CNH é obrigatória para motoristas" });
-            }
+        if (usuarioData.numero_placas >= 2 && !placa_2) {
+          return res.status(400).json({ error: "Imagem da placa 2 é obrigatória quando o número de placas é 2 ou mais" });
         }
+        if (usuarioData.numero_placas === 3 && !placa_3) {
+          return res.status(400).json({ error: "Imagem da placa 3 é obrigatória quando o número de placas é 3" });
+        }
+        // Valida formato das strings Base64
+        for (const [docName, docValue] of Object.entries(documentos)) {
+          if (docValue && !docValue.startsWith('data:image')) {
+            return res.status(400).json({ error: `Formato inválido para o documento ${docName}` });
+          }
+        }
+        // Valida celular
+        if (!/^\d{10,11}$/.test(celular)) {
+          return res.status(400).json({ error: "Celular inválido. Use apenas números (10 ou 11 dígitos)." });
+        }
+      }
 
-        // Cria o usuário
-        const usuarioCriado = await usuariosRepository.criarUsuario({
-            usuario: usuarioData,
-            imagemBase64: imagem_perfil, // Envia apenas a string base64
-            documentos // Envia o objeto de documentos
-        });
+      // Cria o usuário
+      const usuarioCriado = await usuariosRepository.criarUsuario({
+        usuario: { ...usuarioData, celular },
+        imagemBase64: imagem_perfil,
+        documentos
+      });
 
-        // Remove a senha do retorno
-        const usuarioRetorno = usuarioCriado.toJSON();
-        delete usuarioRetorno.senha;
+      // Remove a senha do retorno
+      const usuarioRetorno = usuarioCriado.toJSON();
+      delete usuarioRetorno.senha;
 
-        res.status(201).json({
-            message: "Usuário cadastrado com sucesso",
-            usuario: usuarioRetorno
-        });
+      res.status(201).json({
+        message: "Usuário cadastrado com sucesso",
+        usuario: usuarioRetorno
+      });
     } catch (error) {
-        console.error("Erro no cadastro:", error);
-        res.status(500).json({ 
-            error: "Erro ao cadastrar usuário",
-            details: error.message 
-        });
+      console.error("Erro no cadastro:", error);
+      res.status(500).json({ 
+        error: "Erro ao cadastrar usuário",
+        details: error.message 
+      });
     }
-}
-
-
+  }
 
   async function logar(req, res) {
     try {
