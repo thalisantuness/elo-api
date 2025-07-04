@@ -6,7 +6,6 @@ const authConfig = require("../config/auth.json");
 function UsuarioController() {
   async function cadastrar(req, res) {
     try {
-      // Extrai os campos de imagens separadamente
       const { 
         imagem_perfil,
         comprovante_residencia_motorista,
@@ -17,11 +16,43 @@ function UsuarioController() {
         placa_1,
         placa_2,
         placa_3,
+        alvara,
+        comprovante_empresa,
+        documento_empresa,
         celular,
+        cnpj,
+        nome_referencia_pessoal_1,
+        numero_referencia_pessoal_1,
+        nome_referencia_pessoal_2,
+        numero_referencia_pessoal_2,
+        nome_referencia_pessoal_3,
+        numero_referencia_pessoal_3,
+        nome_referencia_comercial_1,
+        numero_referencia_comercial_1,
+        nome_referencia_comercial_2,
+        numero_referencia_comercial_2,
+        nome_referencia_comercial_3,
+        numero_referencia_comercial_3,
+        nome_referencia_motorista_1,
+        numero_referencia_motorista_1,
+        nome_referencia_motorista_2,
+        numero_referencia_motorista_2,
+        nome_referencia_motorista_3,
+        numero_referencia_motorista_3,
+        nome_responsavel_administrativo,
+        telefone_responsavel_administrativo,
+        tipo_conta,
         ...usuarioData
       } = req.body;
 
-      // Prepara o objeto de documentos para upload
+      const validTipoConta = (value) => {
+        if (!value) return null;
+        const lowerValue = value.toLowerCase();
+        if (lowerValue === "corrente" || lowerValue === "conta corrente") return "CORRENTE";
+        if (lowerValue === "poupança" || lowerValue === "poupanca" || lowerValue === "conta poupança") return "POUPANÇA";
+        return null;
+      };
+
       const documentos = {
         comprovante_residencia_motorista,
         documento_dono_caminhao,
@@ -30,24 +61,33 @@ function UsuarioController() {
         cnh,
         placa_1,
         placa_2,
-        placa_3
+        placa_3,
+        alvara,
+        comprovante_empresa,
+        documento_empresa
       };
 
-      // Validações básicas
       if (!usuarioData.email || !usuarioData.senha || !usuarioData.role || !celular) {
         return res.status(400).json({ error: "Email, senha, role e celular são obrigatórios" });
       }
 
-      // Verifica se usuário já existe
       const usuarioExistente = await usuariosRepository.buscarUsuarioPorEmail(usuarioData.email);
       if (usuarioExistente) {
         return res.status(400).json({ error: "Email já cadastrado" });
       }
 
-      // Validações específicas por role
+      if (!/^\d{10,11}$/.test(celular)) {
+        return res.status(400).json({ error: "Celular inválido. Use apenas números (10 ou 11 dígitos)." });
+      }
+
+      let cleanedCnpj = cnpj ? cnpj.replace(/[^\d]/g, '') : null;
+      if (cleanedCnpj && !/^\d{14}$/.test(cleanedCnpj)) {
+        return res.status(400).json({ error: "CNPJ inválido. Use 14 dígitos." });
+      }
+
       if (usuarioData.role === "motorista") {
         if (!antt || !cnh || !comprovante_residencia_motorista || !documento_dono_caminhao || !comprovante_residencia_dono_caminhao) {
-          return res.status(400).json({ error: "ANNT, CNH, comprovante de residência do motorista, documento do dono do caminhão e comprovante de residência do dono do caminhão são obrigatórios para motoristas" });
+          return res.status(400).json({ error: "ANTT, CNH, comprovante de residência do motorista, documento do dono do caminhão e comprovante de residência do dono do caminhão são obrigatórios para motoristas" });
         }
         if (usuarioData.numero_placas >= 1 && !placa_1) {
           return res.status(400).json({ error: "Imagem da placa 1 é obrigatória quando o número de placas é 1 ou mais" });
@@ -58,26 +98,74 @@ function UsuarioController() {
         if (usuarioData.numero_placas === 3 && !placa_3) {
           return res.status(400).json({ error: "Imagem da placa 3 é obrigatória quando o número de placas é 3" });
         }
-        // Valida formato das strings Base64
         for (const [docName, docValue] of Object.entries(documentos)) {
           if (docValue && !docValue.startsWith('data:image')) {
             return res.status(400).json({ error: `Formato inválido para o documento ${docName}` });
           }
         }
-        // Valida celular
-        if (!/^\d{10,11}$/.test(celular)) {
-          return res.status(400).json({ error: "Celular inválido. Use apenas números (10 ou 11 dígitos)." });
+      } else if (usuarioData.role === "empresa") {
+        if (!nome_responsavel_administrativo || !telefone_responsavel_administrativo || !cleanedCnpj) {
+          return res.status(400).json({ error: "Nome do responsável administrativo, telefone do responsável e CNPJ são obrigatórios para empresas" });
         }
+        if (!/^\d{10,11}$/.test(telefone_responsavel_administrativo)) {
+          return res.status(400).json({ error: "Telefone do responsável administrativo inválido. Use apenas números (10 ou 11 dígitos)." });
+        }
+        for (const [docName, docValue] of Object.entries({ alvara, comprovante_empresa, documento_empresa })) {
+          if (docValue && !docValue.startsWith('data:image')) {
+            return res.status(400).json({ error: `Formato inválido para o documento ${docName}` });
+          }
+        }
+        const referenciasTelefones = [
+          numero_referencia_pessoal_1,
+          numero_referencia_pessoal_2,
+          numero_referencia_pessoal_3,
+          numero_referencia_comercial_1,
+          numero_referencia_comercial_2,
+          numero_referencia_comercial_3,
+          numero_referencia_motorista_1,
+          numero_referencia_motorista_2,
+          numero_referencia_motorista_3
+        ].filter(t => t);
+        for (const telefone of referenciasTelefones) {
+          if (!/^\d{10,11}$/.test(telefone)) {
+            return res.status(400).json({ error: "Telefone de referência inválido. Use apenas números (10 ou 11 dígitos)." });
+          }
+        }
+      } else {
+        return res.status(400).json({ error: "Role inválido. Use 'motorista' ou 'empresa'." });
       }
 
-      // Cria o usuário
       const usuarioCriado = await usuariosRepository.criarUsuario({
-        usuario: { ...usuarioData, celular },
+        usuario: { 
+          ...usuarioData, 
+          celular,
+          cnpj: cleanedCnpj,
+          nome_referencia_pessoal_1,
+          numero_referencia_pessoal_1,
+          nome_referencia_pessoal_2,
+          numero_referencia_pessoal_2,
+          nome_referencia_pessoal_3,
+          numero_referencia_pessoal_3,
+          nome_referencia_comercial_1,
+          numero_referencia_comercial_1,
+          nome_referencia_comercial_2,
+          numero_referencia_comercial_2,
+          nome_referencia_comercial_3,
+          numero_referencia_comercial_3,
+          nome_referencia_motorista_1,
+          numero_referencia_motorista_1,
+          nome_referencia_motorista_2,
+          numero_referencia_motorista_2,
+          nome_referencia_motorista_3,
+          numero_referencia_motorista_3,
+          nome_responsavel_administrativo,
+          telefone_responsavel_administrativo,
+          tipo_conta: validTipoConta(tipo_conta)
+        },
         imagemBase64: imagem_perfil,
         documentos
       });
 
-      // Remove a senha do retorno
       const usuarioRetorno = usuarioCriado.toJSON();
       delete usuarioRetorno.senha;
 
@@ -103,13 +191,11 @@ function UsuarioController() {
         return res.status(404).json({ error: "Usuário não encontrado" });
       }
 
-      // Verifica senha
       const senhaValida = await bcrypt.compare(senha, usuario.senha);
       if (!senhaValida) {
         return res.status(401).json({ error: "Senha incorreta" });
       }
 
-      // Gera token JWT
       const token = jwt.sign(
         {
           usuario_id: usuario.usuario_id,
@@ -120,7 +206,6 @@ function UsuarioController() {
         { expiresIn: "24h" }
       );
 
-      // Retorna dados seguros (sem senha)
       const resposta = {
         usuario: {
           usuario_id: usuario.usuario_id,
@@ -177,10 +262,9 @@ function UsuarioController() {
       const { id } = req.params;
       const dadosAtualizacao = req.body;
 
-      // Remove campos que não devem ser atualizados
       delete dadosAtualizacao.senha;
       delete dadosAtualizacao.usuario_id;
-      delete dadosAtualizacao.role; // Não permitir mudar o role
+      delete dadosAtualizacao.role;
 
       const [updated] = await usuariosRepository.atualizarUsuario(id, dadosAtualizacao);
 
