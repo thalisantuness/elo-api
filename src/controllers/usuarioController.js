@@ -48,8 +48,8 @@ function UsuarioController() {
       const validTipoConta = (value) => {
         if (!value) return null;
         const lowerValue = value.toLowerCase();
-        if (lowerValue === "corrente" || lowerValue === "conta corrente") return "CORRENTE";
-        if (lowerValue === "poupança" || lowerValue === "poupanca" || lowerValue === "conta poupança") return "POUPANÇA";
+        if (lowerValue === "corrente" || lowerValue === "conta corrente") return "Corrente"; 
+        if (lowerValue === "poupança" || lowerValue === "poupanca" || lowerValue === "conta poupança") return "Poupança"; 
         return null;
       };
 
