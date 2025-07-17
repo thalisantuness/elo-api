@@ -2,6 +2,7 @@ const usuariosRepository = require("../repositories/usuariosRepository");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const authConfig = require("../config/auth.json");
+const { Sequelize } = require("sequelize");
 
 function UsuarioController() {
   async function cadastrar(req, res) {
@@ -224,19 +225,37 @@ function UsuarioController() {
     }
   }
 
-  async function listar(req, res) {
-    try {
-      const usuarios = await usuariosRepository.listarUsuarios();
-      res.json(usuarios.map(u => {
+ async function listar(req, res) {
+  try {
+    const { role: userRole } = req.user; // Role do usuário logado (do token)
+    
+    // Define qual role queremos buscar (oposta à do usuário logado)
+    const targetRole = userRole === 'motorista' ? 'empresa' : 'motorista';
+    
+    const usuarios = await usuariosRepository.listarUsuarios({ 
+      role: targetRole,
+      usuario_id: { [Sequelize.Op.ne]: req.user.usuario_id } // Exclui o próprio usuário
+    });
+
+    res.json(
+      usuarios.map((u) => {
         const usuario = u.toJSON();
         delete usuario.senha;
-        return usuario;
-      }));
-    } catch (error) {
-      console.error("Erro ao listar usuários:", error);
-      res.status(500).json({ error: "Erro ao listar usuários" });
-    }
+        return {
+          usuario_id: usuario.usuario_id,
+          nome_completo: usuario.nome_completo,
+          email: usuario.email,
+          role: usuario.role,
+          imagem_perfil: usuario.imagem_perfil,
+          celular: usuario.celular // Adicione mais campos se necessário
+        };
+      })
+    );
+  } catch (error) {
+    console.error("Erro ao listar usuários:", error);
+    res.status(500).json({ error: "Erro ao listar usuários" });
   }
+}
 
   async function buscarPorId(req, res) {
     try {
