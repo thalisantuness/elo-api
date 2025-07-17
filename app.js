@@ -8,7 +8,7 @@ const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
 const authConfig = require("./src/config/auth.json");
 const ChatSocketController = require("./src/controllers/chatSocketController");
-const chatSocketController = ChatSocketController();
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -38,9 +38,8 @@ io.use((socket, next) => {
   }
 });
 
-// Inicializar Socket.IO com o controller
-
-
+// Passar a instância do io para o ChatSocketController
+const chatSocketController = ChatSocketController(io);
 io.on("connection", chatSocketController.handleSocketConnection);
 
 sequelize
