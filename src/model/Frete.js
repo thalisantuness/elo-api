@@ -1,6 +1,6 @@
 const { Sequelize } = require("sequelize");
 const sequelize = require("../utils/db");
-const { Usuario } = require("../model/Usuarios");
+const { Usuario } = require("./Usuarios");
 
 const Frete = sequelize.define(
   "Frete",
@@ -20,13 +20,13 @@ const Frete = sequelize.define(
     },
     motorista_id: {
       type: Sequelize.INTEGER,
-      allowNull: false,
+      allowNull: true,
       references: {
         model: "usuarios",
         key: "usuario_id",
       },
     },
-    data_solicitacao: {
+    data_criacao: {
       type: Sequelize.DATE,
       defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
     },
@@ -36,10 +36,10 @@ const Frete = sequelize.define(
     },
     status: {
       type: Sequelize.ENUM(
-        "anunciado",
-        "solicitado",
-        "em_andamento",
-        "finalizado"
+        "anunciado",     
+        "em_andamento", 
+        "finalizado",
+        "cancelado"
       ),
       defaultValue: "anunciado",
     },

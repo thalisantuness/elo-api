@@ -39,7 +39,7 @@ const Usuario = sequelize.define(
       allowNull: true,
     },
     data_nascimento: {
-      type: Sequelize.DATE,
+      type: Sequelize.STRING,
       allowNull: true,
     },
     endereco: {

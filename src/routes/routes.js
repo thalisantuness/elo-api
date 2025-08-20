@@ -11,6 +11,8 @@ const ChatController = require("../controllers/chatController");
 const chatController = ChatController();
 const FreteController = require("../controllers/freteController");
 const freteController = FreteController();
+const SolicitacaoController = require("../controllers/solicitacaoController");
+const solicitacaoController = SolicitacaoController();
 
 router.post("/cadastrar", usuarioController.cadastrar);
 router.post("/login", usuarioController.logar);
@@ -24,6 +26,13 @@ router.get("/fretes/:id", freteController.buscarPorId);
 router.get("/conversas", authMiddleware, chatController.listarConversas);
 router.get("/conversas/:conversa_id/mensagens", authMiddleware, chatController.listarMensagens);
 router.put("/mensagens/:mensagem_id/lida", authMiddleware, chatController.marcarComoLida);
+
+
+router.post("/solicitacoes", authMiddleware, solicitacaoController.solicitar);
+router.get("/solicitacoes/empresa", authMiddleware, solicitacaoController.listarPorEmpresa);
+router.get("/solicitacoes/motorista", authMiddleware, solicitacaoController.listarPorMotorista);
+router.put("/solicitacoes/:id/responder", authMiddleware, solicitacaoController.responder);
+
 
 // New route to create a conversation
 router.post("/conversas", authMiddleware, async (req, res) => {

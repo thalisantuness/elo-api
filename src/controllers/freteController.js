@@ -1,29 +1,24 @@
 const freteRepository = require("../repositories/freteRepository");
 const { Usuario } = require("../model/Usuarios");
+const { Sequelize } = require("sequelize");
+const { Frete } = require("../model/Frete");
 
 function FreteController() {
   async function criar(req, res) {
     try {
-      const { empresa_id, motorista_id, data_prevista_entrega } = req.body;
+      const { empresa_id, data_prevista_entrega } = req.body;
       const usuarioLogadoId = req.user.usuario_id;
 
-      if (!empresa_id || !motorista_id) {
-        return res
-          .status(400)
-          .json({ error: "Empresa e motorista são obrigatórios" });
+      if (!empresa_id) {
+        return res.status(400).json({ error: "Empresa é obrigatória" });
       }
 
-      const [empresa, motorista] = await Promise.all([
-        Usuario.findOne({ where: { usuario_id: empresa_id, role: "empresa" } }),
-        Usuario.findOne({
-          where: { usuario_id: motorista_id, role: "motorista" },
-        }),
-      ]);
+      const empresa = await Usuario.findOne({
+        where: { usuario_id: empresa_id, role: "empresa" },
+      });
 
-      if (!empresa || !motorista) {
-        return res
-          .status(400)
-          .json({ error: "Empresa ou motorista inválidos" });
+      if (!empresa) {
+        return res.status(400).json({ error: "Empresa inválida" });
       }
 
       if (req.user.role !== "empresa" || usuarioLogadoId !== empresa_id) {
@@ -32,8 +27,8 @@ function FreteController() {
 
       const frete = await freteRepository.criarFrete({
         empresa_id,
-        motorista_id,
         data_prevista_entrega,
+        motorista_id: null,
         status: "anunciado",
       });
 
@@ -47,7 +42,28 @@ function FreteController() {
   async function listar(req, res) {
     try {
       const usuario_id = req.user.usuario_id;
-      const fretes = await freteRepository.listarFretesPorUsuario(usuario_id);
+      const role = req.user.role;
+
+      let fretes;
+
+      if (role === "motorista") {
+        fretes = await Frete.findAll({
+          where: {
+            status: "anunciado",
+            empresa_id: { [Sequelize.Op.ne]: usuario_id },
+          },
+          include: [
+            {
+              association: "Empresa",
+              attributes: ["usuario_id", "nome_completo", "imagem_perfil"],
+            },
+          ],
+          order: [["data_criacao", "DESC"]],
+        });
+      } else {
+        fretes = await freteRepository.listarFretesPorUsuario(usuario_id);
+      }
+
       res.json(fretes);
     } catch (error) {
       console.error("Erro ao listar fretes:", error);
@@ -59,6 +75,7 @@ function FreteController() {
     try {
       const { id } = req.params;
       const usuario_id = req.user.usuario_id;
+      const role = req.user.role;
 
       const frete = await freteRepository.buscarFretePorId(id);
 
@@ -66,10 +83,17 @@ function FreteController() {
         return res.status(404).json({ error: "Frete não encontrado" });
       }
 
-      if (
-        frete.empresa_id !== usuario_id &&
-        frete.motorista_id !== usuario_id
-      ) {
+      if (role === "motorista") {
+        if (
+          frete.status === "anunciado" ||
+          (frete.status === "em_andamento" && frete.motorista_id === usuario_id)
+        ) {
+          return res.json(frete);
+        }
+        return res.status(403).json({ error: "Acesso não autorizado" });
+      }
+
+      if (frete.empresa_id !== usuario_id) {
         return res.status(403).json({ error: "Acesso não autorizado" });
       }
 
