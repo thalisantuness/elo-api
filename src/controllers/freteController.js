@@ -104,10 +104,53 @@ function FreteController() {
     }
   }
 
+  async function atualizar(req, res) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const usuario_id = req.user.usuario_id;
+    const role = req.user.role;
+
+    // Validar se o status é válido
+    const statusValidos = ["anunciado", "em_andamento", "finalizado", "cancelado"];
+    if (status && !statusValidos.includes(status)) {
+      return res.status(400).json({ error: "Status inválido" });
+    }
+
+    // Buscar o frete
+    const frete = await freteRepository.buscarFretePorId(id);
+    if (!frete) {
+      return res.status(404).json({ error: "Frete não encontrado" });
+    }
+
+    // Verificar permissões - apenas a empresa dona pode atualizar
+    if (frete.empresa_id !== usuario_id) {
+      return res.status(403).json({ error: "Acesso não autorizado" });
+    }
+
+    // Atualizar o frete
+    const dadosAtualizacao = { status };
+    const resultado = await freteRepository.atualizarFrete(id, dadosAtualizacao);
+
+    if (resultado[0] === 0) {
+      return res.status(400).json({ error: "Nenhuma alteração realizada" });
+    }
+
+    // Buscar o frete atualizado para retornar
+    const freteAtualizado = await freteRepository.buscarFretePorId(id);
+    res.json(freteAtualizado);
+
+  } catch (error) {
+    console.error("Erro ao atualizar frete:", error);
+    res.status(500).json({ error: "Erro ao atualizar frete" });
+  }
+}
+
   return {
     criar,
     listar,
     buscarPorId,
+    atualizar
   };
 }
 
