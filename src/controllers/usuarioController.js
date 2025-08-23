@@ -305,6 +305,48 @@ function UsuarioController() {
     }
   }
 
+  async function buscarDocumentosMotorista(req, res) {
+  try {
+    const usuario_id = req.user?.usuario_id;
+    if (!usuario_id) {
+      return res.status(401).json({ error: "Usuário não autenticado" });
+    }
+
+    const usuario = await usuariosRepository.buscarUsuarioPorId(usuario_id);
+    if (!usuario) {
+      return res.status(404).json({ error: "Usuário não encontrado" });
+    }
+
+    if (usuario.role !== "motorista") {
+      return res.status(403).json({ error: "Acesso permitido apenas para motoristas" });
+    }
+
+    const documentos = {
+      cnh: usuario.cnh,
+      comprovante_residencia_motorista: usuario.comprovante_residencia_motorista,
+      documento_dono_caminhao: usuario.documento_dono_caminhao,
+      comprovante_residencia_dono_caminhao: usuario.comprovante_residencia_dono_caminhao,
+    };
+
+    // Filtra apenas os documentos que existem (não nulos)
+    const documentosValidos = Object.entries(documentos)
+      .filter(([_, url]) => url)
+      .reduce((acc, [key, url]) => ({ ...acc, [key]: url }), {});
+
+    if (Object.keys(documentosValidos).length === 0) {
+      return res.status(404).json({ error: "Nenhum documento encontrado" });
+    }
+
+    res.json({
+      message: "Documentos encontrados com sucesso",
+      documentos: documentosValidos,
+    });
+  } catch (error) {
+    console.error("Erro ao buscar documentos:", error);
+    res.status(500).json({ error: "Erro ao buscar documentos" });
+  }
+}
+
   async function deletar(req, res) {
     try {
       const { id } = req.params;
@@ -327,7 +369,8 @@ function UsuarioController() {
     listar,
     buscarPorId,
     atualizar,
-    deletar
+    deletar,
+    buscarDocumentosMotorista,
   };
 }
 

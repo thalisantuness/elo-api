@@ -34,6 +34,7 @@ router.get("/solicitacoes/empresa", authMiddleware, solicitacaoController.listar
 router.get("/solicitacoes/motorista", authMiddleware, solicitacaoController.listarPorMotorista);
 router.put("/solicitacoes/:id/responder", authMiddleware, solicitacaoController.responder);
 
+router.get("/documentos/motorista", authMiddleware, usuarioController.buscarDocumentosMotorista);
 
 // New route to create a conversation
 router.post("/conversas", authMiddleware, async (req, res) => {
@@ -67,6 +68,9 @@ router.post("/conversas", authMiddleware, async (req, res) => {
       destinatario_id,
       frete_id
     );
+
+
+    
 
     // Fetch recipient details for response
     const usuario1 = await Usuario.findByPk(conversa.usuario1_id, {
