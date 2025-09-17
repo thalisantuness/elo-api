@@ -24,6 +24,7 @@ router.post("/fretes", authMiddleware, freteController.criar);
 router.get("/fretes", authMiddleware, freteController.listar);
 router.get("/fretes/:id", freteController.buscarPorId);
 router.put("/fretes/:id", authMiddleware, freteController.atualizar);
+router.delete("/fretes/:id", authMiddleware, freteController.deletar);
 router.get("/conversas", authMiddleware, chatController.listarConversas);
 router.get("/conversas/:conversa_id/mensagens", authMiddleware, chatController.listarMensagens);
 router.put("/mensagens/:mensagem_id/lida", authMiddleware, chatController.marcarComoLida);

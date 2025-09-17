@@ -34,10 +34,70 @@ const Frete = sequelize.define(
       type: Sequelize.DATE,
       allowNull: true,
     },
+    origem_estado: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+    origem_cidade: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+    destino_estado: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+    destino_cidade: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+    valor_frete: {
+      type: Sequelize.DECIMAL(10, 2),
+      allowNull: true,
+    },
+    precisa_lona: {
+      type: Sequelize.BOOLEAN,
+      allowNull: true,
+    },
+    produto_quimico: {
+      type: Sequelize.BOOLEAN,
+      allowNull: true,
+    },
+    observacoes_motorista: {
+      type: Sequelize.TEXT,
+      allowNull: true,
+    },
+    veiculo_tracao: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+    tipos_carreta: {
+      type: Sequelize.STRING, 
+      allowNull: true,
+    },
+    comprimento_carreta: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+    numero_eixos: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+    configuracao_modelo: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+    tipo_carga: {
+      type: Sequelize.STRING,
+      allowNull: true,
+    },
+    observacoes_carga: {
+      type: Sequelize.TEXT,
+      allowNull: true,
+    },
     status: {
       type: Sequelize.ENUM(
-        "anunciado",     
-        "em_andamento", 
+        "anunciado",
+        "em_andamento",
         "finalizado",
         "cancelado"
       ),

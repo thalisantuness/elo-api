@@ -1,4 +1,3 @@
-// repositories/freteRepository.js
 const { Frete } = require("../model/Frete");
 const { Sequelize } = require("sequelize");
 
@@ -23,14 +22,21 @@ async function buscarFretePorId(frete_id) {
   return frete;
 }
 
-async function listarFretesPorUsuario(usuario_id) {
+async function listarFretes(usuario_id, role, filtros = {}) {
+  const whereClause = { ...filtros }; 
+
+  if (role === 'motorista') {
+    whereClause.status = 'anunciado';
+    whereClause.empresa_id = { [Sequelize.Op.ne]: usuario_id };
+  } else { 
+    whereClause[Sequelize.Op.or] = [
+      { empresa_id: usuario_id },
+      { motorista_id: usuario_id }
+    ];
+  }
+
   return await Frete.findAll({
-    where: {
-      [Sequelize.Op.or]: [
-        { empresa_id: usuario_id },
-        { motorista_id: usuario_id }
-      ]
-    },
+    where: whereClause,
     include: [
       {
         association: "Empresa",
@@ -52,9 +58,19 @@ async function atualizarFrete(frete_id, dadosAtualizacao) {
   });
 }
 
+async function deletarFrete(frete_id) {
+  const frete = await Frete.findByPk(frete_id);
+  if (!frete) {
+    return 0; 
+  }
+  await frete.destroy();
+  return 1; 
+}
+
 module.exports = {
   criarFrete,
   buscarFretePorId,
-  listarFretesPorUsuario,
-  atualizarFrete
+  listarFretes, 
+  atualizarFrete,
+  deletarFrete
 };
