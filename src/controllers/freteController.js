@@ -2,6 +2,7 @@ const freteRepository = require("../repositories/freteRepository");
 const { Usuario } = require("../model/Usuarios");
 const { Sequelize } = require("sequelize");
 const { Frete } = require("../model/Frete");
+const sequelize = require("../utils/db");
 
 function FreteController(io) {
   async function criar(req, res) {
