@@ -24,10 +24,11 @@ const Conversa = sequelize.define(
       allowNull: false,
       references: {
         model: "fretes",
-        key: "frete_id"
-      }
+        key: "frete_id",
+      },
+      onUpdate: 'CASCADE',
+      onDelete: 'CASCADE', // Adiciona exclusão em cascata
     },
-  
     usuario2_id: {
       type: Sequelize.INTEGER,
       allowNull: false,

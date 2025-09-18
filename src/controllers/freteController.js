@@ -261,31 +261,34 @@ function FreteController(io) {
     }
   }
 
-  async function deletar(req, res) {
-    try {
-      const { id } = req.params;
-      const usuario_id = req.user.usuario_id;
+async function deletar(req, res) {
+  try {
+    const { id } = req.params;
+    const usuario_id = req.user.usuario_id;
 
-      const frete = await freteRepository.buscarFretePorId(id);
+    const frete = await freteRepository.buscarFretePorId(id);
 
-      if (!frete) {
-        return res.status(404).json({ error: "Frete não encontrado" });
-      }
-
-      if (frete.empresa_id !== usuario_id) {
-        return res
-          .status(403)
-          .json({ error: "Acesso não autorizado para apagar este frete" });
-      }
-
-      await freteRepository.deletarFrete(id);
-
-      res.status(200).json({ message: "Frete apagado com sucesso" });
-    } catch (error) {
-      console.error("Erro ao apagar frete:", error);
-      res.status(500).json({ error: "Erro ao apagar frete" });
+    if (!frete) {
+      return res.status(404).json({ error: "Frete não encontrado" });
     }
+
+    if (frete.empresa_id !== usuario_id) {
+      return res
+        .status(403)
+        .json({ error: "Acesso não autorizado para apagar este frete" });
+    }
+
+    // Usar uma transação para garantir integridade
+    await sequelize.transaction(async (t) => {
+      await freteRepository.deletarFrete(id, { transaction: t });
+    });
+
+    res.status(200).json({ message: "Frete e dados associados apagados com sucesso" });
+  } catch (error) {
+    console.error("Erro ao apagar frete:", error);
+    res.status(500).json({ error: "Erro ao apagar frete" });
   }
+}
 
   return {
     criar,

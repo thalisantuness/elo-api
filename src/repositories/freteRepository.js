@@ -58,13 +58,13 @@ async function atualizarFrete(frete_id, dadosAtualizacao) {
   });
 }
 
-async function deletarFrete(frete_id) {
-  const frete = await Frete.findByPk(frete_id);
+async function deletarFrete(frete_id, options = {}) {
+  const frete = await Frete.findByPk(frete_id, options);
   if (!frete) {
-    return 0; 
+    return 0;
   }
-  await frete.destroy();
-  return 1; 
+  await frete.destroy(options);
+  return 1;
 }
 
 module.exports = {
