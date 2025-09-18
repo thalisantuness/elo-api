@@ -305,6 +305,42 @@ function UsuarioController() {
     }
   }
 
+  async function atualizarPerfil(req, res) {
+    try {
+      const { id } = req.params;
+      const dadosAtualizacao = req.body;
+      const usuarioLogadoId = req.user.usuario_id;
+      
+      // Garante que um utilizador só pode editar o seu próprio perfil
+      if (parseInt(id, 10) !== usuarioLogadoId) {
+          return res.status(403).json({ error: "Não autorizado a editar este perfil." });
+      }
+
+      // Remove campos sensíveis que não devem ser atualizados por esta rota
+      delete dadosAtualizacao.senha;
+      delete dadosAtualizacao.role;
+      delete dadosAtualizacao.usuario_id;
+
+      const usuarioAtualizado = await usuariosRepository.atualizarPerfil(id, dadosAtualizacao);
+
+      if (!usuarioAtualizado) {
+          return res.status(404).json({ error: "Utilizador não encontrado ou nenhuma alteração realizada." });
+      }
+
+      const usuarioRetorno = usuarioAtualizado.toJSON();
+      delete usuarioRetorno.senha;
+
+      res.json({
+          message: "Perfil atualizado com sucesso!",
+          usuario: usuarioRetorno
+      });
+
+    } catch (error) {
+        console.error("Erro ao atualizar perfil:", error);
+        res.status(500).json({ error: "Erro interno ao atualizar perfil." });
+    }
+  }
+  
   async function buscarDocumentosMotorista(req, res) {
   try {
     const usuario_id = req.user?.usuario_id;
@@ -371,6 +407,7 @@ function UsuarioController() {
     atualizar,
     deletar,
     buscarDocumentosMotorista,
+    atualizarPerfil, 
   };
 }
 
