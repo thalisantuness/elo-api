@@ -79,41 +79,117 @@ function FreteController(io) {
   async function listar(req, res) {
     try {
       const { usuario_id, role } = req.user;
-      const { origem_cidade, destino_cidade, tipo_carga, filtro } = req.query;
+      const {
+        origem_cidade,
+        origem_estado,
+        destino_cidade,
+        destino_estado,
+        tipo_carga,
+        veiculo_tracao,
+        tipos_carreta,
+        comprimento_carreta,
+        numero_eixos,
+        configuracao_modelo,
+        valor_frete,
+        precisa_lona,
+        produto_quimico,
+        data_prevista_entrega,
+        filtro,
+      } = req.query;
 
       const filtros = {};
 
-      if (tipo_carga) {
-        const tipos = tipo_carga.split(",");
-        filtros.tipo_carga = { [Sequelize.Op.in]: tipos };
-      }
-
-      if (origem_cidade)
-        filtros.origem_cidade = { [Sequelize.Op.iLike]: `%${origem_cidade}%` };
-      if (destino_cidade)
-        filtros.destino_cidade = {
-          [Sequelize.Op.iLike]: `%${destino_cidade}%`,
-        };
-
-      if (filtro) {
+      // Filtros para motorista: apenas fretes anunciados e de outras empresas
+      if (role === "motorista") {
+        filtros.status = "anunciado";
+        filtros.empresa_id = { [Sequelize.Op.ne]: usuario_id };
+      } else {
         filtros[Sequelize.Op.or] = [
-          { origem_cidade: { [Sequelize.Op.iLike]: `%${filtro}%` } },
-          { destino_cidade: { [Sequelize.Op.iLike]: `%${filtro}%` } },
-          { tipo_carga: { [Sequelize.Op.iLike]: `%${filtro}%` } },
+          { empresa_id: usuario_id },
+          { motorista_id: usuario_id },
         ];
       }
 
-      const fretes = await freteRepository.listarFretes(
-        usuario_id,
-        role,
-        filtros
-      );
+      // Filtros de texto simples
+      if (origem_cidade) {
+        filtros.origem_cidade = { [Sequelize.Op.iLike]: `%${origem_cidade}%` };
+      }
+      if (origem_estado) {
+        filtros.origem_estado = { [Sequelize.Op.iLike]: `%${origem_estado}%` };
+      }
+      if (destino_cidade) {
+        filtros.destino_cidade = { [Sequelize.Op.iLike]: `%${destino_cidade}%` };
+      }
+      if (destino_estado) {
+        filtros.destino_estado = { [Sequelize.Op.iLike]: `%${destino_estado}%` };
+      }
+      if (tipo_carga) {
+        filtros.tipo_carga = { [Sequelize.Op.iLike]: `%${tipo_carga}%` };
+      }
+      if (valor_frete) {
+        filtros.valor_frete = parseFloat(valor_frete);
+      }
+      if (precisa_lona !== undefined) {
+        filtros.precisa_lona = precisa_lona === "true";
+      }
+      if (produto_quimico !== undefined) {
+        filtros.produto_quimico = produto_quimico === "true";
+      }
+      if (data_prevista_entrega) {
+        filtros.data_prevista_entrega = {
+          [Sequelize.Op.gte]: new Date(data_prevista_entrega),
+        };
+      }
+
+      // Filtros para campos multivalorados (strings separadas por vírgulas)
+      const multiValuedFields = [
+        { query: veiculo_tracao, field: "veiculo_tracao" },
+        { query: tipos_carreta, field: "tipos_carreta" },
+        { query: comprimento_carreta, field: "comprimento_carreta" },
+        { query: numero_eixos, field: "numero_eixos" },
+        { query: configuracao_modelo, field: "configuracao_modelo" },
+      ];
+
+      multiValuedFields.forEach(({ query, field }) => {
+        if (query) {
+          const valores = query.split(",");
+          console.log(`Filtrando ${field}:`, valores);
+          filtros[field] = {
+            [Sequelize.Op.or]: valores.map((valor) => ({
+              [Sequelize.Op.iLike]: `%${valor.trim()}%`,
+            })),
+          };
+        }
+      });
+
+      // Filtro geral (busca ampla)
+      if (filtro) {
+        filtros[Sequelize.Op.or] = [
+          { origem_cidade: { [Sequelize.Op.iLike]: `%${filtro}%` } },
+          { origem_estado: { [Sequelize.Op.iLike]: `%${filtro}%` } },
+          { destino_cidade: { [Sequelize.Op.iLike]: `%${filtro}%` } },
+          { destino_estado: { [Sequelize.Op.iLike]: `%${filtro}%` } },
+          { tipo_carga: { [Sequelize.Op.iLike]: `%${filtro}%` } },
+          { veiculo_tracao: { [Sequelize.Op.iLike]: `%${filtro}%` } },
+          { tipos_carreta: { [Sequelize.Op.iLike]: `%${filtro}%` } },
+          { comprimento_carreta: { [Sequelize.Op.iLike]: `%${filtro}%` } },
+          { numero_eixos: { [Sequelize.Op.iLike]: `%${filtro}%` } },
+          { configuracao_modelo: { [Sequelize.Op.iLike]: `%${filtro}%` } },
+        ];
+      }
+
+      console.log("Filtros aplicados:", JSON.stringify(filtros, null, 2));
+
+      const fretes = await freteRepository.listarFretes(usuario_id, role, filtros);
+      console.log("Fretes encontrados:", fretes.length);
+
       res.json(fretes);
     } catch (error) {
       console.error("Erro ao listar fretes:", error);
       res.status(500).json({ error: "Erro ao listar fretes" });
     }
   }
+
   async function buscarPorId(req, res) {
     try {
       const { id } = req.params;
@@ -169,10 +245,7 @@ function FreteController(io) {
       delete dadosAtualizacao.motorista_id;
       delete dadosAtualizacao.data_criacao;
 
-      const [updated] = await freteRepository.atualizarFrete(
-        id,
-        dadosAtualizacao
-      );
+      const [updated] = await freteRepository.atualizarFrete(id, dadosAtualizacao);
 
       if (updated === 0) {
         return res
