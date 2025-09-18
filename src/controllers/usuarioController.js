@@ -6,7 +6,6 @@ const { Sequelize } = require("sequelize");
 
 function UsuarioController() {
   async function cadastrar(req, res) {
-    // ... seu código de cadastro existente ...
     try {
       const {
         imagem_perfil,
@@ -228,14 +227,13 @@ function UsuarioController() {
 
   async function listar(req, res) {
     try {
-      const { role: userRole } = req.user; // Role do usuário logado (do token)
+      const { role: userRole } = req.user;
 
-      // Define qual role queremos buscar (oposta à do usuário logado)
       const targetRole = userRole === 'motorista' ? 'empresa' : 'motorista';
 
       const usuarios = await usuariosRepository.listarUsuarios({
         role: targetRole,
-        usuario_id: { [Sequelize.Op.ne]: req.user.usuario_id } // Exclui o próprio usuário
+        usuario_id: { [Sequelize.Op.ne]: req.user.usuario_id }
       });
 
       res.json(
@@ -248,7 +246,7 @@ function UsuarioController() {
             email: usuario.email,
             role: usuario.role,
             imagem_perfil: usuario.imagem_perfil,
-            celular: usuario.celular // Adicione mais campos se necessário
+            celular: usuario.celular
           };
         })
       );
@@ -258,7 +256,6 @@ function UsuarioController() {
     }
   }
 
-  // --- FUNÇÃO CORRIGIDA/READICIONADA ---
   async function buscarPorId(req, res) {
     try {
       const { id } = req.params;
@@ -318,14 +315,12 @@ function UsuarioController() {
         return res.status(403).json({ error: "Não autorizado a editar este perfil." });
       }
 
-      // Campos que NUNCA podem ser alterados
       delete dadosAtualizacao.senha;
       delete dadosAtualizacao.role;
       delete dadosAtualizacao.usuario_id;
       delete dadosAtualizacao.cpf;
       delete dadosAtualizacao.cnpj;
 
-      // Lista completa de campos permitidos para cada role
       const camposPermitidos = {
         comuns: [
           'nome_completo', 'email', 'celular', 'endereco', 'banco',
@@ -383,7 +378,6 @@ function UsuarioController() {
     }
   }
 
-  // --- INÍCIO DAS FUNÇÕES NOVAS ---
   async function alterarSenha(req, res) {
     try {
       const { id } = req.params;
@@ -444,7 +438,6 @@ function UsuarioController() {
       res.status(500).json({ error: "Erro interno ao atualizar o documento." });
     }
   }
-  // --- FIM DAS FUNÇÕES NOVAS ---
 
   async function buscarDocumentosMotorista(req, res) {
     try {
@@ -462,29 +455,66 @@ function UsuarioController() {
         return res.status(403).json({ error: "Acesso permitido apenas para motoristas" });
       }
 
-      const documentos = {
+      // Monta o objeto com todos os campos solicitados
+      const dadosMotorista = {
+        nome_completo: usuario.nome_completo,
+        email: usuario.email,
+        cpf: usuario.cpf,
+        celular: usuario.celular,
+        data_nascimento: usuario.data_nascimento,
+        endereco: usuario.endereco,
+        numero_placas: usuario.numero_placas,
+        placa_1: usuario.placa_1,
+        placa_2: usuario.placa_2,
+        placa_3: usuario.placa_3,
+        antt: usuario.antt,
         cnh: usuario.cnh,
         comprovante_residencia_motorista: usuario.comprovante_residencia_motorista,
         documento_dono_caminhao: usuario.documento_dono_caminhao,
         comprovante_residencia_dono_caminhao: usuario.comprovante_residencia_dono_caminhao,
+        imagem_perfil: usuario.imagem_perfil,
+        nome_referencia_pessoal_1: usuario.nome_referencia_pessoal_1,
+        numero_referencia_pessoal_1: usuario.numero_referencia_pessoal_1,
+        nome_referencia_pessoal_2: usuario.nome_referencia_pessoal_2,
+        numero_referencia_pessoal_2: usuario.numero_referencia_pessoal_2,
+        nome_referencia_pessoal_3: usuario.nome_referencia_pessoal_3,
+        numero_referencia_pessoal_3: usuario.numero_referencia_pessoal_3,
+        nome_referencia_comercial_1: usuario.nome_referencia_comercial_1,
+        numero_referencia_comercial_1: usuario.numero_referencia_comercial_1,
+        nome_referencia_comercial_2: usuario.nome_referencia_comercial_2,
+        numero_referencia_comercial_2: usuario.numero_referencia_comercial_2,
+        nome_referencia_comercial_3: usuario.nome_referencia_comercial_3,
+        numero_referencia_comercial_3: usuario.numero_referencia_comercial_3,
+        nome_referencia_transportadora_1: usuario.nome_referencia_transportadora_1,
+        numero_referencia_transportadora_1: usuario.numero_referencia_transportadora_1,
+        nome_referencia_transportadora_2: usuario.nome_referencia_transportadora_2,
+        numero_referencia_transportadora_2: usuario.numero_referencia_transportadora_2,
+        nome_referencia_transportadora_3: usuario.nome_referencia_transportadora_3,
+        numero_referencia_transportadora_3: usuario.numero_referencia_transportadora_3,
+        banco: usuario.banco,
+        agencia: usuario.agencia,
+        numero_conta: usuario.numero_conta,
+        tipo_conta: usuario.tipo_conta,
+        titular_conta: usuario.titular_conta,
+        cpf_titular_conta: usuario.cpf_titular_conta
       };
 
-      // Filtra apenas os documentos que existem (não nulos)
-      const documentosValidos = Object.entries(documentos)
-        .filter(([_, url]) => url)
-        .reduce((acc, [key, url]) => ({ ...acc, [key]: url }), {});
+      // Filtra apenas os campos não nulos
+      const dadosValidos = Object.entries(dadosMotorista)
+        .filter(([_, value]) => value !== null && value !== undefined)
+        .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
 
-      if (Object.keys(documentosValidos).length === 0) {
-        return res.status(404).json({ error: "Nenhum documento encontrado" });
+      if (Object.keys(dadosValidos).length === 0) {
+        return res.status(404).json({ error: "Nenhum dado encontrado" });
       }
 
       res.json({
-        message: "Documentos encontrados com sucesso",
-        documentos: documentosValidos,
+        message: "Dados do motorista encontrados com sucesso",
+        dados: dadosValidos
       });
     } catch (error) {
-      console.error("Erro ao buscar documentos:", error);
-      res.status(500).json({ error: "Erro ao buscar documentos" });
+      console.error("Erro ao buscar dados do motorista:", error);
+      res.status(500).json({ error: "Erro ao buscar dados do motorista" });
     }
   }
 
@@ -508,7 +538,7 @@ function UsuarioController() {
     cadastrar,
     logar,
     listar,
-    buscarPorId, 
+    buscarPorId,
     atualizar,
     deletar,
     buscarDocumentosMotorista,
