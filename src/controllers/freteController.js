@@ -6,8 +6,8 @@ const { Frete } = require("../model/Frete");
 function FreteController(io) {
   async function criar(req, res) {
     try {
-      const { 
-        empresa_id, 
+      const {
+        empresa_id,
         data_prevista_entrega,
         origem_estado,
         origem_cidade,
@@ -23,7 +23,7 @@ function FreteController(io) {
         numero_eixos,
         configuracao_modelo,
         tipo_carga,
-        observacoes_carga
+        observacoes_carga,
       } = req.body;
       const usuarioLogadoId = req.user.usuario_id;
 
@@ -62,11 +62,11 @@ function FreteController(io) {
         numero_eixos,
         configuracao_modelo,
         tipo_carga,
-        observacoes_carga
+        observacoes_carga,
       });
 
       if (io) {
-        io.emit('novo_frete_disponivel', frete);
+        io.emit("novo_frete_disponivel", frete);
       }
 
       res.status(201).json(frete);
@@ -79,36 +79,41 @@ function FreteController(io) {
   async function listar(req, res) {
     try {
       const { usuario_id, role } = req.user;
-      
-      
-      const { 
-        origem_estado, 
-        origem_cidade, 
-        destino_estado, 
-        destino_cidade, 
-        veiculo_tracao,
-        tipos_carreta,
-        tipo_carga
-      } = req.query;
+      const { origem_cidade, destino_cidade, tipo_carga, filtro } = req.query;
 
       const filtros = {};
-      if (origem_estado) filtros.origem_estado = origem_estado;
-      if (origem_cidade) filtros.origem_cidade = origem_cidade;
-      if (destino_estado) filtros.destino_estado = destino_estado;
-      if (destino_cidade) filtros.destino_cidade = destino_cidade;
-      if (veiculo_tracao) filtros.veiculo_tracao = veiculo_tracao;
-      if (tipos_carreta) filtros.tipos_carreta = { [Sequelize.Op.iLike]: `%${tipos_carreta}%` };
-      if (tipo_carga) filtros.tipo_carga = tipo_carga;
 
-      const fretes = await freteRepository.listarFretes(usuario_id, role, filtros);
-      
+      if (tipo_carga) {
+        const tipos = tipo_carga.split(",");
+        filtros.tipo_carga = { [Sequelize.Op.in]: tipos };
+      }
+
+      if (origem_cidade)
+        filtros.origem_cidade = { [Sequelize.Op.iLike]: `%${origem_cidade}%` };
+      if (destino_cidade)
+        filtros.destino_cidade = {
+          [Sequelize.Op.iLike]: `%${destino_cidade}%`,
+        };
+
+      if (filtro) {
+        filtros[Sequelize.Op.or] = [
+          { origem_cidade: { [Sequelize.Op.iLike]: `%${filtro}%` } },
+          { destino_cidade: { [Sequelize.Op.iLike]: `%${filtro}%` } },
+          { tipo_carga: { [Sequelize.Op.iLike]: `%${filtro}%` } },
+        ];
+      }
+
+      const fretes = await freteRepository.listarFretes(
+        usuario_id,
+        role,
+        filtros
+      );
       res.json(fretes);
     } catch (error) {
       console.error("Erro ao listar fretes:", error);
       res.status(500).json({ error: "Erro ao listar fretes" });
     }
   }
-
   async function buscarPorId(req, res) {
     try {
       const { id } = req.params;
@@ -154,23 +159,29 @@ function FreteController(io) {
       }
 
       if (frete.empresa_id !== usuario_id) {
-        return res.status(403).json({ error: "Acesso não autorizado para editar este frete" });
+        return res
+          .status(403)
+          .json({ error: "Acesso não autorizado para editar este frete" });
       }
-      
+
       delete dadosAtualizacao.frete_id;
       delete dadosAtualizacao.empresa_id;
       delete dadosAtualizacao.motorista_id;
       delete dadosAtualizacao.data_criacao;
 
-      const [updated] = await freteRepository.atualizarFrete(id, dadosAtualizacao);
+      const [updated] = await freteRepository.atualizarFrete(
+        id,
+        dadosAtualizacao
+      );
 
       if (updated === 0) {
-        return res.status(200).json({ message: "Nenhuma alteração detectada.", frete });
+        return res
+          .status(200)
+          .json({ message: "Nenhuma alteração detectada.", frete });
       }
 
       const freteAtualizado = await freteRepository.buscarFretePorId(id);
       res.json(freteAtualizado);
-
     } catch (error) {
       console.error("Erro ao atualizar frete:", error);
       res.status(500).json({ error: "Erro ao atualizar frete" });
@@ -189,13 +200,14 @@ function FreteController(io) {
       }
 
       if (frete.empresa_id !== usuario_id) {
-        return res.status(403).json({ error: "Acesso não autorizado para apagar este frete" });
+        return res
+          .status(403)
+          .json({ error: "Acesso não autorizado para apagar este frete" });
       }
 
       await freteRepository.deletarFrete(id);
 
       res.status(200).json({ message: "Frete apagado com sucesso" });
-
     } catch (error) {
       console.error("Erro ao apagar frete:", error);
       res.status(500).json({ error: "Erro ao apagar frete" });
@@ -207,7 +219,7 @@ function FreteController(io) {
     listar,
     buscarPorId,
     atualizar,
-    deletar
+    deletar,
   };
 }
 
