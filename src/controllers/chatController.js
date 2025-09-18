@@ -3,7 +3,7 @@ const { Conversa } = require("../model/Conversa");
 const { Frete } = require("../model/Frete");
 const { Usuario } = require("../model/Usuarios");
 const { Sequelize } = require("sequelize");
-
+//
 function ChatController() {
   async function listarConversas(req, res) {
     try {
