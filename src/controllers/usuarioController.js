@@ -6,8 +6,9 @@ const { Sequelize } = require("sequelize");
 
 function UsuarioController() {
   async function cadastrar(req, res) {
+    // ... seu código de cadastro existente ...
     try {
-      const { 
+      const {
         imagem_perfil,
         comprovante_residencia_motorista,
         documento_dono_caminhao,
@@ -49,8 +50,8 @@ function UsuarioController() {
       const validTipoConta = (value) => {
         if (!value) return null;
         const lowerValue = value.toLowerCase();
-        if (lowerValue === "corrente" || lowerValue === "conta corrente") return "Corrente"; 
-        if (lowerValue === "poupança" || lowerValue === "poupanca" || lowerValue === "conta poupança") return "Poupança"; 
+        if (lowerValue === "corrente" || lowerValue === "conta corrente") return "Corrente";
+        if (lowerValue === "poupança" || lowerValue === "poupanca" || lowerValue === "conta poupança") return "Poupança";
         return null;
       };
 
@@ -137,8 +138,8 @@ function UsuarioController() {
       }
 
       const usuarioCriado = await usuariosRepository.criarUsuario({
-        usuario: { 
-          ...usuarioData, 
+        usuario: {
+          ...usuarioData,
           celular,
           cnpj: cleanedCnpj,
           nome_referencia_pessoal_1,
@@ -176,9 +177,9 @@ function UsuarioController() {
       });
     } catch (error) {
       console.error("Erro no cadastro:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Erro ao cadastrar usuário",
-        details: error.message 
+        details: error.message
       });
     }
   }
@@ -225,38 +226,39 @@ function UsuarioController() {
     }
   }
 
- async function listar(req, res) {
-  try {
-    const { role: userRole } = req.user; // Role do usuário logado (do token)
-    
-    // Define qual role queremos buscar (oposta à do usuário logado)
-    const targetRole = userRole === 'motorista' ? 'empresa' : 'motorista';
-    
-    const usuarios = await usuariosRepository.listarUsuarios({ 
-      role: targetRole,
-      usuario_id: { [Sequelize.Op.ne]: req.user.usuario_id } // Exclui o próprio usuário
-    });
+  async function listar(req, res) {
+    try {
+      const { role: userRole } = req.user; // Role do usuário logado (do token)
 
-    res.json(
-      usuarios.map((u) => {
-        const usuario = u.toJSON();
-        delete usuario.senha;
-        return {
-          usuario_id: usuario.usuario_id,
-          nome_completo: usuario.nome_completo,
-          email: usuario.email,
-          role: usuario.role,
-          imagem_perfil: usuario.imagem_perfil,
-          celular: usuario.celular // Adicione mais campos se necessário
-        };
-      })
-    );
-  } catch (error) {
-    console.error("Erro ao listar usuários:", error);
-    res.status(500).json({ error: "Erro ao listar usuários" });
+      // Define qual role queremos buscar (oposta à do usuário logado)
+      const targetRole = userRole === 'motorista' ? 'empresa' : 'motorista';
+
+      const usuarios = await usuariosRepository.listarUsuarios({
+        role: targetRole,
+        usuario_id: { [Sequelize.Op.ne]: req.user.usuario_id } // Exclui o próprio usuário
+      });
+
+      res.json(
+        usuarios.map((u) => {
+          const usuario = u.toJSON();
+          delete usuario.senha;
+          return {
+            usuario_id: usuario.usuario_id,
+            nome_completo: usuario.nome_completo,
+            email: usuario.email,
+            role: usuario.role,
+            imagem_perfil: usuario.imagem_perfil,
+            celular: usuario.celular // Adicione mais campos se necessário
+          };
+        })
+      );
+    } catch (error) {
+      console.error("Erro ao listar usuários:", error);
+      res.status(500).json({ error: "Erro ao listar usuários" });
+    }
   }
-}
 
+  // --- FUNÇÃO CORRIGIDA/READICIONADA ---
   async function buscarPorId(req, res) {
     try {
       const { id } = req.params;
@@ -310,78 +312,181 @@ function UsuarioController() {
       const { id } = req.params;
       const dadosAtualizacao = req.body;
       const usuarioLogadoId = req.user.usuario_id;
-      
-      // Garante que um utilizador só pode editar o seu próprio perfil
+      const usuarioLogadoRole = req.user.role;
+
       if (parseInt(id, 10) !== usuarioLogadoId) {
-          return res.status(403).json({ error: "Não autorizado a editar este perfil." });
+        return res.status(403).json({ error: "Não autorizado a editar este perfil." });
       }
 
-      // Remove campos sensíveis que não devem ser atualizados por esta rota
+      // Campos que NUNCA podem ser alterados
       delete dadosAtualizacao.senha;
       delete dadosAtualizacao.role;
       delete dadosAtualizacao.usuario_id;
+      delete dadosAtualizacao.cpf;
+      delete dadosAtualizacao.cnpj;
 
-      const usuarioAtualizado = await usuariosRepository.atualizarPerfil(id, dadosAtualizacao);
+      // Lista completa de campos permitidos para cada role
+      const camposPermitidos = {
+        comuns: [
+          'nome_completo', 'email', 'celular', 'endereco', 'banco',
+          'agencia', 'numero_conta', 'tipo_conta', 'titular_conta', 'cpf_titular_conta'
+        ],
+        motorista: [
+          'data_nascimento', 'numero_placas',
+          'nome_referencia_pessoal_1', 'numero_referencia_pessoal_1',
+          'nome_referencia_pessoal_2', 'numero_referencia_pessoal_2',
+          'nome_referencia_pessoal_3', 'numero_referencia_pessoal_3',
+          'nome_referencia_comercial_1', 'numero_referencia_comercial_1',
+          'nome_referencia_comercial_2', 'numero_referencia_comercial_2',
+          'nome_referencia_transportadora_1', 'numero_referencia_transportadora_1',
+          'nome_referencia_transportadora_2', 'numero_referencia_transportadora_2',
+          'nome_referencia_transportadora_3', 'numero_referencia_transportadora_3'
+        ],
+        empresa: [
+          'nome_responsavel_administrativo', 'telefone_responsavel_administrativo',
+          'nome_referencia_pessoal_1', 'numero_referencia_pessoal_1',
+          'nome_referencia_pessoal_2', 'numero_referencia_pessoal_2',
+          'nome_referencia_comercial_1', 'numero_referencia_comercial_1',
+          'nome_referencia_comercial_2', 'numero_referencia_comercial_2',
+          'nome_referencia_motorista_1', 'numero_referencia_motorista_1',
+          'nome_referencia_motorista_2', 'numero_referencia_motorista_2',
+          'nome_referencia_motorista_3', 'numero_referencia_motorista_3'
+        ]
+      };
+
+      const payloadFinal = {};
+      const camposParaAtualizar = [...camposPermitidos.comuns, ...(camposPermitidos[usuarioLogadoRole] || [])];
+
+      for (const campo of camposParaAtualizar) {
+        if (dadosAtualizacao[campo] !== undefined) {
+          payloadFinal[campo] = dadosAtualizacao[campo];
+        }
+      }
+
+      const usuarioAtualizado = await usuariosRepository.atualizarPerfil(id, payloadFinal);
 
       if (!usuarioAtualizado) {
-          return res.status(404).json({ error: "Utilizador não encontrado ou nenhuma alteração realizada." });
+        return res.status(404).json({ error: "Usuário não encontrado ou nenhuma alteração realizada." });
       }
 
       const usuarioRetorno = usuarioAtualizado.toJSON();
       delete usuarioRetorno.senha;
 
       res.json({
-          message: "Perfil atualizado com sucesso!",
-          usuario: usuarioRetorno
+        message: "Perfil atualizado com sucesso!",
+        usuario: usuarioRetorno
       });
 
     } catch (error) {
-        console.error("Erro ao atualizar perfil:", error);
-        res.status(500).json({ error: "Erro interno ao atualizar perfil." });
+      console.error("Erro ao atualizar perfil:", error);
+      res.status(500).json({ error: "Erro interno ao atualizar perfil." });
     }
   }
-  
+
+  // --- INÍCIO DAS FUNÇÕES NOVAS ---
+  async function alterarSenha(req, res) {
+    try {
+      const { id } = req.params;
+      const { senhaAtual, novaSenha } = req.body;
+      const usuarioLogadoId = req.user.usuario_id;
+
+      if (parseInt(id, 10) !== usuarioLogadoId) {
+        return res.status(403).json({ error: "Não autorizado." });
+      }
+
+      if (!senhaAtual || !novaSenha) {
+        return res.status(400).json({ error: "Senha atual e nova senha são obrigatórias." });
+      }
+
+      const usuario = await usuariosRepository.buscarUsuarioPorIdComSenha(id);
+      if (!usuario) {
+        return res.status(404).json({ error: "Usuário não encontrado." });
+      }
+
+      const senhaValida = await bcrypt.compare(senhaAtual, usuario.senha);
+      if (!senhaValida) {
+        return res.status(401).json({ error: "Senha atual incorreta." });
+      }
+
+      const senhaHash = await bcrypt.hash(novaSenha, 10);
+      await usuariosRepository.atualizarUsuario(id, { senha: senhaHash });
+
+      res.status(200).json({ message: "Senha alterada com sucesso." });
+
+    } catch (error) {
+      console.error("Erro ao alterar senha:", error);
+      res.status(500).json({ error: "Erro interno ao alterar senha." });
+    }
+  }
+
+  async function atualizarDocumento(req, res) {
+    try {
+      const { id } = req.params;
+      const { docType, imageBase64 } = req.body;
+      const usuarioLogadoId = req.user.usuario_id;
+
+      if (parseInt(id, 10) !== usuarioLogadoId) {
+        return res.status(403).json({ error: "Não autorizado." });
+      }
+
+      if (!docType || !imageBase64) {
+        return res.status(400).json({ error: "Tipo do documento e imagem são obrigatórios." });
+      }
+
+      const updatedUser = await usuariosRepository.atualizarDocumentoUsuario(id, docType, imageBase64);
+
+      res.status(200).json({
+        message: "Documento atualizado com sucesso!",
+        usuario: updatedUser
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar documento:", error);
+      res.status(500).json({ error: "Erro interno ao atualizar o documento." });
+    }
+  }
+  // --- FIM DAS FUNÇÕES NOVAS ---
+
   async function buscarDocumentosMotorista(req, res) {
-  try {
-    const usuario_id = req.user?.usuario_id;
-    if (!usuario_id) {
-      return res.status(401).json({ error: "Usuário não autenticado" });
+    try {
+      const usuario_id = req.user?.usuario_id;
+      if (!usuario_id) {
+        return res.status(401).json({ error: "Usuário não autenticado" });
+      }
+
+      const usuario = await usuariosRepository.buscarUsuarioPorId(usuario_id);
+      if (!usuario) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+
+      if (usuario.role !== "motorista") {
+        return res.status(403).json({ error: "Acesso permitido apenas para motoristas" });
+      }
+
+      const documentos = {
+        cnh: usuario.cnh,
+        comprovante_residencia_motorista: usuario.comprovante_residencia_motorista,
+        documento_dono_caminhao: usuario.documento_dono_caminhao,
+        comprovante_residencia_dono_caminhao: usuario.comprovante_residencia_dono_caminhao,
+      };
+
+      // Filtra apenas os documentos que existem (não nulos)
+      const documentosValidos = Object.entries(documentos)
+        .filter(([_, url]) => url)
+        .reduce((acc, [key, url]) => ({ ...acc, [key]: url }), {});
+
+      if (Object.keys(documentosValidos).length === 0) {
+        return res.status(404).json({ error: "Nenhum documento encontrado" });
+      }
+
+      res.json({
+        message: "Documentos encontrados com sucesso",
+        documentos: documentosValidos,
+      });
+    } catch (error) {
+      console.error("Erro ao buscar documentos:", error);
+      res.status(500).json({ error: "Erro ao buscar documentos" });
     }
-
-    const usuario = await usuariosRepository.buscarUsuarioPorId(usuario_id);
-    if (!usuario) {
-      return res.status(404).json({ error: "Usuário não encontrado" });
-    }
-
-    if (usuario.role !== "motorista") {
-      return res.status(403).json({ error: "Acesso permitido apenas para motoristas" });
-    }
-
-    const documentos = {
-      cnh: usuario.cnh,
-      comprovante_residencia_motorista: usuario.comprovante_residencia_motorista,
-      documento_dono_caminhao: usuario.documento_dono_caminhao,
-      comprovante_residencia_dono_caminhao: usuario.comprovante_residencia_dono_caminhao,
-    };
-
-    // Filtra apenas os documentos que existem (não nulos)
-    const documentosValidos = Object.entries(documentos)
-      .filter(([_, url]) => url)
-      .reduce((acc, [key, url]) => ({ ...acc, [key]: url }), {});
-
-    if (Object.keys(documentosValidos).length === 0) {
-      return res.status(404).json({ error: "Nenhum documento encontrado" });
-    }
-
-    res.json({
-      message: "Documentos encontrados com sucesso",
-      documentos: documentosValidos,
-    });
-  } catch (error) {
-    console.error("Erro ao buscar documentos:", error);
-    res.status(500).json({ error: "Erro ao buscar documentos" });
   }
-}
 
   async function deletar(req, res) {
     try {
@@ -403,11 +508,13 @@ function UsuarioController() {
     cadastrar,
     logar,
     listar,
-    buscarPorId,
+    buscarPorId, 
     atualizar,
     deletar,
     buscarDocumentosMotorista,
-    atualizarPerfil, 
+    atualizarPerfil,
+    alterarSenha,
+    atualizarDocumento,
   };
 }
 

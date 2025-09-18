@@ -21,6 +21,10 @@ router.get("/usuarios/:id", usuarioController.buscarPorId);
 router.put("/usuarios/:id", usuarioController.atualizar);
 router.patch("/usuarios/:id", authMiddleware, usuarioController.atualizarPerfil);
 router.delete("/usuarios/:id", usuarioController.deletar);
+
+router.patch("/usuarios/:id/alterar-senha", authMiddleware, usuarioController.alterarSenha);
+router.patch("/usuarios/:id/documento", authMiddleware, usuarioController.atualizarDocumento);
+
 router.post("/fretes", authMiddleware, freteController.criar);
 router.get("/fretes", authMiddleware, freteController.listar);
 router.get("/fretes/:id", freteController.buscarPorId);
@@ -72,7 +76,7 @@ router.post("/conversas", authMiddleware, async (req, res) => {
     );
 
 
-    
+
 
     // Fetch recipient details for response
     const usuario1 = await Usuario.findByPk(conversa.usuario1_id, {
