@@ -8,7 +8,7 @@ const sequelize = require("../utils/db");
 // Helper para deletar um arquivo do S3 a partir da URL
 async function deleteFromS3(fileUrl) {
   if (!fileUrl || !fileUrl.includes(process.env.AWS_BUCKET_NAME)) {
-    console.log("URL inválida ou não pertence ao bucket. Nenhuma ação de exclusão tomada.");
+    console.log("URL inválida ou não pertence ao bucket.");
     return;
   }
   try {
@@ -50,31 +50,21 @@ async function uploadToS3(base64Image, folder) {
 }
 
 async function criarUsuario(dados) {
-  const {
-    usuario,
-    imagemBase64,
-    documentos
-  } = dados;
+  const { usuario, fotoPerfilBase64 } = dados;
 
   const senhaHash = await bcrypt.hash(usuario.senha, 10);
 
   return sequelize.transaction(async (t) => {
-    const uploadResults = {};
+    let foto_perfil = null;
 
-    if (imagemBase64 && imagemBase64.startsWith('data:image')) {
-      uploadResults.imagem_perfil = await uploadToS3(imagemBase64, 'usuarios/perfil');
-    }
-
-    for (const [docName, docBase64] of Object.entries(documentos)) {
-      if (docBase64 && docBase64.startsWith('data:image')) {
-        uploadResults[docName] = await uploadToS3(docBase64, 'usuarios/documentos');
-      }
+    if (fotoPerfilBase64 && fotoPerfilBase64.startsWith('data:image')) {
+      foto_perfil = await uploadToS3(fotoPerfilBase64, 'usuarios/perfil');
     }
 
     const usuarioCriado = await Usuario.create({
       ...usuario,
       senha: senhaHash,
-      ...uploadResults
+      foto_perfil
     }, { transaction: t });
 
     return usuarioCriado;
@@ -111,9 +101,7 @@ async function atualizarPerfil(id, dadosPerfil) {
   return null;
 }
 
-// NOVA FUNÇÃO: Necessária para a validação da senha antiga
 async function buscarUsuarioPorIdComSenha(id) {
-  // Esta função busca o usuário incluindo o campo 'senha', que normalmente é excluído
   const usuario = await Usuario.findOne({
     where: { usuario_id: id },
     attributes: { include: ['senha'] }
@@ -121,30 +109,31 @@ async function buscarUsuarioPorIdComSenha(id) {
   return usuario;
 }
 
-
-// NOVA FUNÇÃO: Lida com a substituição de um documento
-async function atualizarDocumentoUsuario(usuarioId, docType, imageBase64) {
+async function atualizarFotoPerfil(usuarioId, imageBase64) {
   return sequelize.transaction(async (t) => {
     const usuario = await Usuario.findByPk(usuarioId, { transaction: t });
     if (!usuario) {
       throw new Error('Usuário não encontrado');
     }
 
-    const oldFileUrl = usuario[docType];
+    const oldFileUrl = usuario.foto_perfil;
     if (oldFileUrl) {
       await deleteFromS3(oldFileUrl);
     }
 
-    const folder = docType === 'imagem_perfil' ? 'usuarios/perfil' : 'usuarios/documentos';
-    const newFileUrl = await uploadToS3(imageBase64, folder);
+    const newFileUrl = await uploadToS3(imageBase64, 'usuarios/perfil');
 
-    usuario[docType] = newFileUrl;
+    usuario.foto_perfil = newFileUrl;
     await usuario.save({ transaction: t });
 
     const usuarioAtualizado = usuario.toJSON();
     delete usuarioAtualizado.senha;
     return usuarioAtualizado;
   });
+}
+
+async function listarUsuarios(filtros = {}) {
+  return await Usuario.findAll({ where: filtros });
 }
 
 module.exports = {
@@ -155,7 +144,7 @@ module.exports = {
   deletarUsuario,
   atualizarPerfil,
   buscarUsuarioPorIdComSenha,
-  atualizarDocumentoUsuario,
-  listarUsuarios: async (filtros = {}) => await Usuario.findAll({ where: filtros }),
+  atualizarFotoPerfil,
+  listarUsuarios,
 };
 

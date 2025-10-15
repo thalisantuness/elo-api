@@ -1,0 +1,287 @@
+{
+  "info": {
+    "name": "back-pdv API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "d2a3bb4e-5c8c-4f2b-9f4d-collection"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{login_email}}\",\n  \"senha\": \"{{login_senha}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "try {",
+                  "  const json = pm.response.json();",
+                  "  if (json && json.token) {",
+                  "    pm.collectionVariables.set('token', json.token);",
+                  "  }",
+                  "} catch (e) { }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cadastrar usuário",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/cadastrar",
+              "host": ["{{baseUrl}}"],
+              "path": ["cadastrar"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"motorista\",\n  \"email\": \"user@example.com\",\n  \"senha\": \"senha123\",\n  \"nome\": \"Nome Teste\",\n  \"telefone\": \"11999999999\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usuarios",
+      "item": [
+        {
+          "name": "Listar usuários (alterna role)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/usuarios", "host": ["{{baseUrl}}"], "path": ["usuarios"] }
+          }
+        },
+        {
+          "name": "Buscar usuário por ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/usuarios/{{usuario_id}}", "host": ["{{baseUrl}}"], "path": ["usuarios", "{{usuario_id}}"] }
+          }
+        },
+        {
+          "name": "Atualizar usuário (PUT)",
+          "request": {
+            "method": "PUT",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/usuarios/{{usuario_id}}", "host": ["{{baseUrl}}"], "path": ["usuarios", "{{usuario_id}}"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Nome Atualizado\",\n  \"telefone\": \"11988887777\",\n  \"email\": \"novo@example.com\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Atualizar Perfil (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/usuarios/{{usuario_id}}", "host": ["{{baseUrl}}"], "path": ["usuarios", "{{usuario_id}}"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Novo Nome\",\n  \"telefone\": \"11977776666\",\n  \"endereco\": \"Rua X, 123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Alterar senha",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/usuarios/{{usuario_id}}/alterar-senha", "host": ["{{baseUrl}}"], "path": ["usuarios", "{{usuario_id}}", "alterar-senha"] },
+            "body": { "mode": "raw", "raw": "{\n  \"senhaAtual\": \"senha123\",\n  \"novaSenha\": \"senha456\"\n}" }
+          }
+        },
+        {
+          "name": "Atualizar documento (perfil ou outros)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": { "raw": "{{baseUrl}}/usuarios/{{usuario_id}}/documento", "host": ["{{baseUrl}}"], "path": ["usuarios", "{{usuario_id}}", "documento"] },
+            "body": { "mode": "raw", "raw": "{\n  \"docType\": \"imagem_perfil\",\n  \"imageBase64\": \"data:image/jpeg;base64,SEUS_DADOS\"\n}" }
+          }
+        },
+        {
+          "name": "Deletar usuário",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/usuarios/{{usuario_id}}", "host": ["{{baseUrl}}"], "path": ["usuarios", "{{usuario_id}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fretes",
+      "item": [
+        {
+          "name": "Criar frete",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/fretes", "host": ["{{baseUrl}}"], "path": ["fretes"] },
+            "body": { "mode": "raw", "raw": "{\n  \"origem\": \"Cidade A\",\n  \"destino\": \"Cidade B\",\n  \"peso\": 100\n}" }
+          }
+        },
+        { "name": "Listar fretes", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{baseUrl}}/fretes", "host": ["{{baseUrl}}"], "path": ["fretes"] } } },
+        { "name": "Buscar frete por ID", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/fretes/{{frete_id}}", "host": ["{{baseUrl}}"], "path": ["fretes", "{{frete_id}}"] } } },
+        { "name": "Atualizar frete", "request": { "method": "PUT", "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{baseUrl}}/fretes/{{frete_id}}", "host": ["{{baseUrl}}"], "path": ["fretes", "{{frete_id}}"] }, "body": { "mode": "raw", "raw": "{ }" } } },
+        { "name": "Deletar frete", "request": { "method": "DELETE", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{baseUrl}}/fretes/{{frete_id}}", "host": ["{{baseUrl}}"], "path": ["fretes", "{{frete_id}}"] } } }
+      ]
+    },
+    {
+      "name": "Conversas",
+      "item": [
+        {
+          "name": "Listar conversas",
+          "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{baseUrl}}/conversas", "host": ["{{baseUrl}}"], "path": ["conversas"] } }
+        },
+        {
+          "name": "Criar conversa",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ],
+            "url": { "raw": "{{baseUrl}}/conversas", "host": ["{{baseUrl}}"], "path": ["conversas"] },
+            "body": { "mode": "raw", "raw": "{\n  \"frete_id\": {{frete_id}},\n  \"destinatario_id\": {{destinatario_id}}\n}" }
+          }
+        },
+        {
+          "name": "Listar mensagens por conversa",
+          "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{baseUrl}}/conversas/{{conversa_id}}/mensagens", "host": ["{{baseUrl}}"], "path": ["conversas", "{{conversa_id}}", "mensagens"] } }
+        },
+        {
+          "name": "Marcar mensagem como lida",
+          "request": { "method": "PUT", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{baseUrl}}/mensagens/{{mensagem_id}}/lida", "host": ["{{baseUrl}}"], "path": ["mensagens", "{{mensagem_id}}", "lida"] } }
+        }
+      ]
+    },
+    {
+      "name": "Solicitações",
+      "item": [
+        {
+          "name": "Criar solicitação",
+          "request": { "method": "POST", "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{baseUrl}}/solicitacoes", "host": ["{{baseUrl}}"], "path": ["solicitacoes"] }, "body": { "mode": "raw", "raw": "{ }" } }
+        },
+        { "name": "Listar solicitações (empresa)", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{baseUrl}}/solicitacoes/empresa", "host": ["{{baseUrl}}"], "path": ["solicitacoes", "empresa"] } } },
+        { "name": "Listar solicitações (motorista)", "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{baseUrl}}/solicitacoes/motorista", "host": ["{{baseUrl}}"], "path": ["solicitacoes", "motorista"] } } },
+        { "name": "Responder solicitação", "request": { "method": "PUT", "header": [ { "key": "Content-Type", "value": "application/json" }, { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{baseUrl}}/solicitacoes/{{solicitacao_id}}/responder", "host": ["{{baseUrl}}"], "path": ["solicitacoes", "{{solicitacao_id}}", "responder"] }, "body": { "mode": "raw", "raw": "{ \n  \"status\": \"aprovada\" \n}" } } }
+      ]
+    }
+    ,
+    {
+      "name": "Produtos",
+      "item": [
+        {
+          "name": "Listar produtos",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/produtos", "host": ["{{baseUrl}}"], "path": ["produtos"] }
+          }
+        },
+        {
+          "name": "Buscar produto por ID",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/produtos/{{produto_id}}", "host": ["{{baseUrl}}"], "path": ["produtos", "{{produto_id}}"] }
+          }
+        },
+        {
+          "name": "Criar produto",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/produtos", "host": ["{{baseUrl}}"], "path": ["produtos"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Produto X\",\n  \"valor\": 199.9,\n  \"tipo_comercializacao\": \"Venda\",\n  \"tipo_produto\": \"Eletrônico\",\n  \"estado_id\": 1,\n  \"foto_principal\": \"data:image/jpeg;base64,SEU_BASE64\",\n  \"fotos_secundarias\": [\n    \"data:image/jpeg;base64,SEU_BASE64_1\"\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Atualizar produto",
+          "request": {
+            "method": "PUT",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/produtos/{{produto_id}}", "host": ["{{baseUrl}}"], "path": ["produtos", "{{produto_id}}"] },
+            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Produto X (editado)\",\n  \"valor\": 249.9,\n  \"tipo_comercializacao\": \"Aluguel\",\n  \"tipo_produto\": \"Eletrônico\"\n}" }
+          }
+        },
+        {
+          "name": "Deletar produto",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/produtos/{{produto_id}}", "host": ["{{baseUrl}}"], "path": ["produtos", "{{produto_id}}"] }
+          }
+        },
+        {
+          "name": "Adicionar foto secundária",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "url": { "raw": "{{baseUrl}}/produtos/{{produto_id}}/fotos", "host": ["{{baseUrl}}"], "path": ["produtos", "{{produto_id}}", "fotos"] },
+            "body": { "mode": "raw", "raw": "{\n  \"imageBase64\": \"data:image/jpeg;base64,SEU_BASE64\"\n}" }
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Nothing global"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4000" },
+    { "key": "token", "value": "" },
+    { "key": "usuario_id", "value": "1" },
+    { "key": "frete_id", "value": "1" },
+    { "key": "conversa_id", "value": "1" },
+    { "key": "mensagem_id", "value": "1" },
+    { "key": "destinatario_id", "value": "2" },
+    { "key": "solicitacao_id", "value": "1" },
+    { "key": "login_email", "value": "user@example.com" },
+    { "key": "login_senha", "value": "senha123" }
+  ]
+}
+
+

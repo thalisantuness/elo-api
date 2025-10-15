@@ -7,164 +7,53 @@ const { Sequelize } = require("sequelize");
 function UsuarioController() {
   async function cadastrar(req, res) {
     try {
-      const {
-        imagem_perfil,
-        comprovante_residencia_motorista,
-        documento_dono_caminhao,
-        comprovante_residencia_dono_caminhao,
-        antt,
-        cnh,
-        placa_1,
-        placa_2,
-        placa_3,
-        alvara,
-        comprovante_empresa,
-        documento_empresa,
-        celular,
-        cnpj,
-        nome_referencia_pessoal_1,
-        numero_referencia_pessoal_1,
-        nome_referencia_pessoal_2,
-        numero_referencia_pessoal_2,
-        nome_referencia_pessoal_3,
-        numero_referencia_pessoal_3,
-        nome_referencia_comercial_1,
-        numero_referencia_comercial_1,
-        nome_referencia_comercial_2,
-        numero_referencia_comercial_2,
-        nome_referencia_comercial_3,
-        numero_referencia_comercial_3,
-        nome_referencia_motorista_1,
-        numero_referencia_motorista_1,
-        nome_referencia_motorista_2,
-        numero_referencia_motorista_2,
-        nome_referencia_motorista_3,
-        numero_referencia_motorista_3,
-        nome_responsavel_administrativo,
-        telefone_responsavel_administrativo,
-        tipo_conta,
-        ...usuarioData
-      } = req.body;
+      const { nome, telefone, email, senha, role, foto_perfil } = req.body;
 
-      const validTipoConta = (value) => {
-        if (!value) return null;
-        const lowerValue = value.toLowerCase();
-        if (lowerValue === "corrente" || lowerValue === "conta corrente") return "Corrente";
-        if (lowerValue === "poupança" || lowerValue === "poupanca" || lowerValue === "conta poupança") return "Poupança";
-        return null;
-      };
-
-      const documentos = {
-        comprovante_residencia_motorista,
-        documento_dono_caminhao,
-        comprovante_residencia_dono_caminhao,
-        antt,
-        cnh,
-        placa_1,
-        placa_2,
-        placa_3,
-        alvara,
-        comprovante_empresa,
-        documento_empresa
-      };
-
-      if (!usuarioData.email || !usuarioData.senha || !usuarioData.role || !celular) {
-        return res.status(400).json({ error: "Email, senha, role e celular são obrigatórios" });
+      // Validações básicas
+      if (!nome || !telefone || !email || !senha || !role) {
+        return res.status(400).json({ 
+          error: "Nome, telefone, email, senha e role são obrigatórios" 
+        });
       }
 
-      const usuarioExistente = await usuariosRepository.buscarUsuarioPorEmail(usuarioData.email);
+      // Validar role
+      if (!["motorista", "empresa"].includes(role)) {
+        return res.status(400).json({ 
+          error: "Role inválido. Use 'motorista' ou 'empresa'." 
+        });
+      }
+
+      // Verificar se o email já existe
+      const usuarioExistente = await usuariosRepository.buscarUsuarioPorEmail(email);
       if (usuarioExistente) {
         return res.status(400).json({ error: "Email já cadastrado" });
       }
 
-      if (!/^\d{10,11}$/.test(celular)) {
-        return res.status(400).json({ error: "Celular inválido. Use apenas números (10 ou 11 dígitos)." });
+      // Validar formato do telefone (10 ou 11 dígitos)
+      const telefoneLimpo = telefone.replace(/\D/g, '');
+      if (!/^\d{10,11}$/.test(telefoneLimpo)) {
+        return res.status(400).json({ 
+          error: "Telefone inválido. Use apenas números (10 ou 11 dígitos)." 
+        });
       }
 
-      let cleanedCnpj = cnpj ? cnpj.replace(/[^\d]/g, '') : null;
-      if (cleanedCnpj && !/^\d{14}$/.test(cleanedCnpj)) {
-        return res.status(400).json({ error: "CNPJ inválido. Use 14 dígitos." });
+      // Validar formato da foto (se fornecida)
+      if (foto_perfil && !foto_perfil.startsWith('data:image')) {
+        return res.status(400).json({ 
+          error: "Formato inválido para a foto de perfil" 
+        });
       }
 
-      if (usuarioData.role === "motorista") {
-        if (!antt || !cnh || !comprovante_residencia_motorista || !documento_dono_caminhao || !comprovante_residencia_dono_caminhao) {
-          return res.status(400).json({ error: "ANTT, CNH, comprovante de residência do motorista, documento do dono do caminhão e comprovante de residência do dono do caminhão são obrigatórios para motoristas" });
-        }
-        if (usuarioData.numero_placas >= 1 && !placa_1) {
-          return res.status(400).json({ error: "Imagem da placa 1 é obrigatória quando o número de placas é 1 ou mais" });
-        }
-        if (usuarioData.numero_placas >= 2 && !placa_2) {
-          return res.status(400).json({ error: "Imagem da placa 2 é obrigatória quando o número de placas é 2 ou mais" });
-        }
-        if (usuarioData.numero_placas === 3 && !placa_3) {
-          return res.status(400).json({ error: "Imagem da placa 3 é obrigatória quando o número de placas é 3" });
-        }
-        for (const [docName, docValue] of Object.entries(documentos)) {
-          if (docValue && !docValue.startsWith('data:image')) {
-            return res.status(400).json({ error: `Formato inválido para o documento ${docName}` });
-          }
-        }
-      } else if (usuarioData.role === "empresa") {
-        if (!nome_responsavel_administrativo || !telefone_responsavel_administrativo || !cleanedCnpj) {
-          return res.status(400).json({ error: "Nome do responsável administrativo, telefone do responsável e CNPJ são obrigatórios para empresas" });
-        }
-        if (!/^\d{10,11}$/.test(telefone_responsavel_administrativo)) {
-          return res.status(400).json({ error: "Telefone do responsável administrativo inválido. Use apenas números (10 ou 11 dígitos)." });
-        }
-        for (const [docName, docValue] of Object.entries({ alvara, comprovante_empresa, documento_empresa })) {
-          if (docValue && !docValue.startsWith('data:image')) {
-            return res.status(400).json({ error: `Formato inválido para o documento ${docName}` });
-          }
-        }
-        const referenciasTelefones = [
-          numero_referencia_pessoal_1,
-          numero_referencia_pessoal_2,
-          numero_referencia_pessoal_3,
-          numero_referencia_comercial_1,
-          numero_referencia_comercial_2,
-          numero_referencia_comercial_3,
-          numero_referencia_motorista_1,
-          numero_referencia_motorista_2,
-          numero_referencia_motorista_3
-        ].filter(t => t);
-        for (const telefone of referenciasTelefones) {
-          if (!/^\d{10,11}$/.test(telefone)) {
-            return res.status(400).json({ error: "Telefone de referência inválido. Use apenas números (10 ou 11 dígitos)." });
-          }
-        }
-      } else {
-        return res.status(400).json({ error: "Role inválido. Use 'motorista' ou 'empresa'." });
-      }
-
+      // Criar usuário
       const usuarioCriado = await usuariosRepository.criarUsuario({
         usuario: {
-          ...usuarioData,
-          celular,
-          cnpj: cleanedCnpj,
-          nome_referencia_pessoal_1,
-          numero_referencia_pessoal_1,
-          nome_referencia_pessoal_2,
-          numero_referencia_pessoal_2,
-          nome_referencia_pessoal_3,
-          numero_referencia_pessoal_3,
-          nome_referencia_comercial_1,
-          numero_referencia_comercial_1,
-          nome_referencia_comercial_2,
-          numero_referencia_comercial_2,
-          nome_referencia_comercial_3,
-          numero_referencia_comercial_3,
-          nome_referencia_motorista_1,
-          numero_referencia_motorista_1,
-          nome_referencia_motorista_2,
-          numero_referencia_motorista_2,
-          nome_referencia_motorista_3,
-          numero_referencia_motorista_3,
-          nome_responsavel_administrativo,
-          telefone_responsavel_administrativo,
-          tipo_conta: validTipoConta(tipo_conta)
+          nome,
+          telefone: telefoneLimpo,
+          email,
+          senha,
+          role
         },
-        imagemBase64: imagem_perfil,
-        documentos
+        fotoPerfilBase64: foto_perfil
       });
 
       const usuarioRetorno = usuarioCriado.toJSON();
@@ -186,6 +75,10 @@ function UsuarioController() {
   async function logar(req, res) {
     try {
       const { email, senha } = req.body;
+
+      if (!email || !senha) {
+        return res.status(400).json({ error: "Email e senha são obrigatórios" });
+      }
 
       const usuario = await usuariosRepository.buscarUsuarioPorEmail(email);
       if (!usuario) {
@@ -212,8 +105,9 @@ function UsuarioController() {
           usuario_id: usuario.usuario_id,
           email: usuario.email,
           role: usuario.role,
-          nome_completo: usuario.nome_completo,
-          imagem_perfil: usuario.imagem_perfil
+          nome: usuario.nome,
+          telefone: usuario.telefone,
+          foto_perfil: usuario.foto_perfil
         },
         token
       };
@@ -229,6 +123,7 @@ function UsuarioController() {
     try {
       const { role: userRole } = req.user;
 
+      // Lista usuários do role oposto ao do usuário logado
       const targetRole = userRole === 'motorista' ? 'empresa' : 'motorista';
 
       const usuarios = await usuariosRepository.listarUsuarios({
@@ -242,11 +137,11 @@ function UsuarioController() {
           delete usuario.senha;
           return {
             usuario_id: usuario.usuario_id,
-            nome_completo: usuario.nome_completo,
+            nome: usuario.nome,
+            telefone: usuario.telefone,
             email: usuario.email,
             role: usuario.role,
-            imagem_perfil: usuario.imagem_perfil,
-            celular: usuario.celular
+            foto_perfil: usuario.foto_perfil
           };
         })
       );
@@ -280,9 +175,22 @@ function UsuarioController() {
       const { id } = req.params;
       const dadosAtualizacao = req.body;
 
+      // Não permitir atualização de campos críticos
       delete dadosAtualizacao.senha;
       delete dadosAtualizacao.usuario_id;
       delete dadosAtualizacao.role;
+      delete dadosAtualizacao.foto_perfil; // Atualizar foto por endpoint separado
+
+      // Validar telefone se fornecido
+      if (dadosAtualizacao.telefone) {
+        const telefoneLimpo = dadosAtualizacao.telefone.replace(/\D/g, '');
+        if (!/^\d{10,11}$/.test(telefoneLimpo)) {
+          return res.status(400).json({ 
+            error: "Telefone inválido. Use apenas números (10 ou 11 dígitos)." 
+          });
+        }
+        dadosAtualizacao.telefone = telefoneLimpo;
+      }
 
       const [updated] = await usuariosRepository.atualizarUsuario(id, dadosAtualizacao);
 
@@ -309,59 +217,35 @@ function UsuarioController() {
       const { id } = req.params;
       const dadosAtualizacao = req.body;
       const usuarioLogadoId = req.user.usuario_id;
-      const usuarioLogadoRole = req.user.role;
 
+      // Verificar se o usuário está atualizando seu próprio perfil
       if (parseInt(id, 10) !== usuarioLogadoId) {
         return res.status(403).json({ error: "Não autorizado a editar este perfil." });
       }
 
+      // Não permitir atualização de campos críticos
       delete dadosAtualizacao.senha;
       delete dadosAtualizacao.role;
       delete dadosAtualizacao.usuario_id;
-      delete dadosAtualizacao.cpf;
-      delete dadosAtualizacao.cnpj;
+      delete dadosAtualizacao.foto_perfil; // Atualizar foto por endpoint separado
 
-      const camposPermitidos = {
-        comuns: [
-          'nome_completo', 'email', 'celular', 'endereco', 'banco',
-          'agencia', 'numero_conta', 'tipo_conta', 'titular_conta', 'cpf_titular_conta'
-        ],
-        motorista: [
-          'data_nascimento', 'numero_placas',
-          'nome_referencia_pessoal_1', 'numero_referencia_pessoal_1',
-          'nome_referencia_pessoal_2', 'numero_referencia_pessoal_2',
-          'nome_referencia_pessoal_3', 'numero_referencia_pessoal_3',
-          'nome_referencia_comercial_1', 'numero_referencia_comercial_1',
-          'nome_referencia_comercial_2', 'numero_referencia_comercial_2',
-          'nome_referencia_transportadora_1', 'numero_referencia_transportadora_1',
-          'nome_referencia_transportadora_2', 'numero_referencia_transportadora_2',
-          'nome_referencia_transportadora_3', 'numero_referencia_transportadora_3'
-        ],
-        empresa: [
-          'nome_responsavel_administrativo', 'telefone_responsavel_administrativo',
-          'nome_referencia_pessoal_1', 'numero_referencia_pessoal_1',
-          'nome_referencia_pessoal_2', 'numero_referencia_pessoal_2',
-          'nome_referencia_comercial_1', 'numero_referencia_comercial_1',
-          'nome_referencia_comercial_2', 'numero_referencia_comercial_2',
-          'nome_referencia_motorista_1', 'numero_referencia_motorista_1',
-          'nome_referencia_motorista_2', 'numero_referencia_motorista_2',
-          'nome_referencia_motorista_3', 'numero_referencia_motorista_3'
-        ]
-      };
-
-      const payloadFinal = {};
-      const camposParaAtualizar = [...camposPermitidos.comuns, ...(camposPermitidos[usuarioLogadoRole] || [])];
-
-      for (const campo of camposParaAtualizar) {
-        if (dadosAtualizacao[campo] !== undefined) {
-          payloadFinal[campo] = dadosAtualizacao[campo];
+      // Validar telefone se fornecido
+      if (dadosAtualizacao.telefone) {
+        const telefoneLimpo = dadosAtualizacao.telefone.replace(/\D/g, '');
+        if (!/^\d{10,11}$/.test(telefoneLimpo)) {
+          return res.status(400).json({ 
+            error: "Telefone inválido. Use apenas números (10 ou 11 dígitos)." 
+          });
         }
+        dadosAtualizacao.telefone = telefoneLimpo;
       }
 
-      const usuarioAtualizado = await usuariosRepository.atualizarPerfil(id, payloadFinal);
+      const usuarioAtualizado = await usuariosRepository.atualizarPerfil(id, dadosAtualizacao);
 
       if (!usuarioAtualizado) {
-        return res.status(404).json({ error: "Usuário não encontrado ou nenhuma alteração realizada." });
+        return res.status(404).json({ 
+          error: "Usuário não encontrado ou nenhuma alteração realizada." 
+        });
       }
 
       const usuarioRetorno = usuarioAtualizado.toJSON();
@@ -384,24 +268,30 @@ function UsuarioController() {
       const { senhaAtual, novaSenha } = req.body;
       const usuarioLogadoId = req.user.usuario_id;
 
+      // Verificar autorização
       if (parseInt(id, 10) !== usuarioLogadoId) {
         return res.status(403).json({ error: "Não autorizado." });
       }
 
       if (!senhaAtual || !novaSenha) {
-        return res.status(400).json({ error: "Senha atual e nova senha são obrigatórias." });
+        return res.status(400).json({ 
+          error: "Senha atual e nova senha são obrigatórias." 
+        });
       }
 
+      // Buscar usuário com senha
       const usuario = await usuariosRepository.buscarUsuarioPorIdComSenha(id);
       if (!usuario) {
         return res.status(404).json({ error: "Usuário não encontrado." });
       }
 
+      // Validar senha atual
       const senhaValida = await bcrypt.compare(senhaAtual, usuario.senha);
       if (!senhaValida) {
         return res.status(401).json({ error: "Senha atual incorreta." });
       }
 
+      // Atualizar senha
       const senhaHash = await bcrypt.hash(novaSenha, 10);
       await usuariosRepository.atualizarUsuario(id, { senha: senhaHash });
 
@@ -413,108 +303,36 @@ function UsuarioController() {
     }
   }
 
-  async function atualizarDocumento(req, res) {
+  async function atualizarFotoPerfil(req, res) {
     try {
       const { id } = req.params;
-      const { docType, imageBase64 } = req.body;
+      const { foto_perfil } = req.body;
       const usuarioLogadoId = req.user.usuario_id;
 
+      // Verificar autorização
       if (parseInt(id, 10) !== usuarioLogadoId) {
         return res.status(403).json({ error: "Não autorizado." });
       }
 
-      if (!docType || !imageBase64) {
-        return res.status(400).json({ error: "Tipo do documento e imagem são obrigatórios." });
+      if (!foto_perfil) {
+        return res.status(400).json({ error: "Foto de perfil é obrigatória." });
       }
 
-      const updatedUser = await usuariosRepository.atualizarDocumentoUsuario(id, docType, imageBase64);
+      if (!foto_perfil.startsWith('data:image')) {
+        return res.status(400).json({ 
+          error: "Formato inválido para a foto de perfil" 
+        });
+      }
+
+      const updatedUser = await usuariosRepository.atualizarFotoPerfil(id, foto_perfil);
 
       res.status(200).json({
-        message: "Documento atualizado com sucesso!",
+        message: "Foto de perfil atualizada com sucesso!",
         usuario: updatedUser
       });
     } catch (error) {
-      console.error("Erro ao atualizar documento:", error);
-      res.status(500).json({ error: "Erro interno ao atualizar o documento." });
-    }
-  }
-
-  async function buscarDocumentosMotorista(req, res) {
-    try {
-      const usuario_id = req.user?.usuario_id;
-      if (!usuario_id) {
-        return res.status(401).json({ error: "Usuário não autenticado" });
-      }
-
-      const usuario = await usuariosRepository.buscarUsuarioPorId(usuario_id);
-      if (!usuario) {
-        return res.status(404).json({ error: "Usuário não encontrado" });
-      }
-
-      if (usuario.role !== "motorista") {
-        return res.status(403).json({ error: "Acesso permitido apenas para motoristas" });
-      }
-
-      // Monta o objeto com todos os campos solicitados
-      const dadosMotorista = {
-        nome_completo: usuario.nome_completo,
-        email: usuario.email,
-        cpf: usuario.cpf,
-        celular: usuario.celular,
-        data_nascimento: usuario.data_nascimento,
-        endereco: usuario.endereco,
-        numero_placas: usuario.numero_placas,
-        placa_1: usuario.placa_1,
-        placa_2: usuario.placa_2,
-        placa_3: usuario.placa_3,
-        antt: usuario.antt,
-        cnh: usuario.cnh,
-        comprovante_residencia_motorista: usuario.comprovante_residencia_motorista,
-        documento_dono_caminhao: usuario.documento_dono_caminhao,
-        comprovante_residencia_dono_caminhao: usuario.comprovante_residencia_dono_caminhao,
-        imagem_perfil: usuario.imagem_perfil,
-        nome_referencia_pessoal_1: usuario.nome_referencia_pessoal_1,
-        numero_referencia_pessoal_1: usuario.numero_referencia_pessoal_1,
-        nome_referencia_pessoal_2: usuario.nome_referencia_pessoal_2,
-        numero_referencia_pessoal_2: usuario.numero_referencia_pessoal_2,
-        nome_referencia_pessoal_3: usuario.nome_referencia_pessoal_3,
-        numero_referencia_pessoal_3: usuario.numero_referencia_pessoal_3,
-        nome_referencia_comercial_1: usuario.nome_referencia_comercial_1,
-        numero_referencia_comercial_1: usuario.numero_referencia_comercial_1,
-        nome_referencia_comercial_2: usuario.nome_referencia_comercial_2,
-        numero_referencia_comercial_2: usuario.numero_referencia_comercial_2,
-        nome_referencia_comercial_3: usuario.nome_referencia_comercial_3,
-        numero_referencia_comercial_3: usuario.numero_referencia_comercial_3,
-        nome_referencia_transportadora_1: usuario.nome_referencia_transportadora_1,
-        numero_referencia_transportadora_1: usuario.numero_referencia_transportadora_1,
-        nome_referencia_transportadora_2: usuario.nome_referencia_transportadora_2,
-        numero_referencia_transportadora_2: usuario.numero_referencia_transportadora_2,
-        nome_referencia_transportadora_3: usuario.nome_referencia_transportadora_3,
-        numero_referencia_transportadora_3: usuario.numero_referencia_transportadora_3,
-        banco: usuario.banco,
-        agencia: usuario.agencia,
-        numero_conta: usuario.numero_conta,
-        tipo_conta: usuario.tipo_conta,
-        titular_conta: usuario.titular_conta,
-        cpf_titular_conta: usuario.cpf_titular_conta
-      };
-
-      // Filtra apenas os campos não nulos
-      const dadosValidos = Object.entries(dadosMotorista)
-        .filter(([_, value]) => value !== null && value !== undefined)
-        .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
-
-      if (Object.keys(dadosValidos).length === 0) {
-        return res.status(404).json({ error: "Nenhum dado encontrado" });
-      }
-
-      res.json({
-        message: "Dados do motorista encontrados com sucesso",
-        dados: dadosValidos
-      });
-    } catch (error) {
-      console.error("Erro ao buscar dados do motorista:", error);
-      res.status(500).json({ error: "Erro ao buscar dados do motorista" });
+      console.error("Erro ao atualizar foto de perfil:", error);
+      res.status(500).json({ error: "Erro interno ao atualizar foto de perfil." });
     }
   }
 
@@ -541,10 +359,9 @@ function UsuarioController() {
     buscarPorId,
     atualizar,
     deletar,
-    buscarDocumentosMotorista,
     atualizarPerfil,
     alterarSenha,
-    atualizarDocumento,
+    atualizarFotoPerfil,
   };
 }
 
