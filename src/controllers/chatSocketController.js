@@ -4,6 +4,27 @@ const { Usuario } = require("../model/Usuarios");
 const { Sequelize } = require("sequelize");
 const chatRepository = require("../repositories/chatRepository");
 
+// Função para validar permissões de conversa
+function validarPermissaoConversa(roleRemetente, roleDestinatario) {
+  // Admin pode conversar com qualquer um
+  if (roleRemetente === 'admin') {
+    return true;
+  }
+  
+  // Cliente só pode conversar com empresa
+  if (roleRemetente === 'cliente' && roleDestinatario === 'empresa') {
+    return true;
+  }
+  
+  // Empresa só pode conversar com cliente
+  if (roleRemetente === 'empresa' && roleDestinatario === 'cliente') {
+    return true;
+  }
+  
+  // Outros casos não são permitidos
+  return false;
+}
+
 function ChatSocketController(io) {
   const handleSocketConnection = (socket) => {
     console.log(`Socket conectado: ${socket.id}, Usuário: ${socket.user.email}`);
@@ -26,12 +47,10 @@ function ChatSocketController(io) {
           throw new Error("Destinatário não encontrado");
         }
 
-     
-        if (
-          (socket.user.role === "cliente" && destinatario.role !== "empresa") ||
-          (socket.user.role === "empresa" && destinatario.role !== "cliente")
-        ) {
-          throw new Error("Conversas só são permitidas entre clientes e empresas");
+        // Validar permissões de conversa
+        const podeConversar = validarPermissaoConversa(socket.user.role, destinatario.role);
+        if (!podeConversar) {
+          throw new Error("Conversa não permitida entre estes tipos de usuário");
         }
 
     

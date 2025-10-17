@@ -5,6 +5,27 @@ const authMiddleware = require("../middleware/auth");
 const chatRepository = require("../repositories/chatRepository");
 const { Usuario } = require("../model/Usuarios");
 
+// Função para validar permissões de conversa
+function validarPermissaoConversa(roleRemetente, roleDestinatario) {
+  // Admin pode conversar com qualquer um
+  if (roleRemetente === 'admin') {
+    return true;
+  }
+  
+  // Cliente só pode conversar com empresa
+  if (roleRemetente === 'cliente' && roleDestinatario === 'empresa') {
+    return true;
+  }
+  
+  // Empresa só pode conversar com cliente
+  if (roleRemetente === 'empresa' && roleDestinatario === 'cliente') {
+    return true;
+  }
+  
+  // Outros casos não são permitidos
+  return false;
+}
+
 const UsuarioController = require("../controllers/usuariosController");
 const usuariosController = UsuarioController();
 const ChatController = require("../controllers/chatController");
@@ -51,13 +72,11 @@ router.post("/conversas", authMiddleware, async (req, res) => {
       return res.status(404).json({ error: "Destinatário não encontrado" });
     }
 
-    // Validar roles (cliente só pode falar com empresa e vice-versa)
-    if (
-      (req.user.role === "cliente" && destinatario.role !== "empresa") ||
-      (req.user.role === "empresa" && destinatario.role !== "cliente")
-    ) {
+    // Validar permissões de conversa
+    const podeConversar = validarPermissaoConversa(req.user.role, destinatario.role);
+    if (!podeConversar) {
       return res.status(400).json({
-        error: "Conversas só são permitidas entre clientes e empresas",
+        error: "Conversa não permitida entre estes tipos de usuário",
       });
     }
 

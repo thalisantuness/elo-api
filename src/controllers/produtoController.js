@@ -4,14 +4,81 @@ const s3 = require('../utils/awsConfig');
 const { v4: uuidv4 } = require('uuid');
 
 function ProdutoController() {
+  function validateBase64Image(base64String) {
+    if (!base64String || typeof base64String !== 'string') {
+      throw new Error('String base64 inválida');
+    }
+
+    if (!base64String.startsWith('data:image/')) {
+      throw new Error('String não é uma imagem base64 válida');
+    }
+
+    const parts = base64String.split(',');
+    if (parts.length !== 2) {
+      throw new Error('Formato base64 inválido');
+    }
+
+    const base64Data = parts[1];
+    if (!base64Data || base64Data.length < 100) {
+      throw new Error('Dados de imagem base64 muito pequenos ou vazios');
+    }
+
+    // Verificar se é base64 válido
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
+    if (!base64Regex.test(base64Data)) {
+      throw new Error('Dados base64 contêm caracteres inválidos');
+    }
+
+    return base64Data;
+  }
+
   async function compressImage(buffer) {
-    return sharp(buffer).resize(800).jpeg({ quality: 80 }).toBuffer();
+    try {
+      // Verificar se o buffer tem conteúdo
+      if (!buffer || buffer.length === 0) {
+        throw new Error('Buffer de imagem vazio');
+      }
+
+      // Verificar se o buffer é uma imagem válida
+      const metadata = await sharp(buffer).metadata();
+      console.log('Metadata da imagem:', metadata);
+      
+      if (!metadata.format) {
+        throw new Error('Formato de imagem não suportado');
+      }
+      
+      // Redimensionar e comprimir a imagem
+      return await sharp(buffer)
+        .resize(800, 800, { 
+          fit: 'inside',
+          withoutEnlargement: true 
+        })
+        .jpeg({ quality: 80 })
+        .toBuffer();
+    } catch (error) {
+      console.error('Erro ao comprimir imagem:', error.message);
+      console.error('Tamanho do buffer:', buffer ? buffer.length : 'undefined');
+      throw new Error(`Erro ao processar imagem: ${error.message}`);
+    }
   }
 
   async function uploadToS3(buffer, folder) {
-    const key = `${folder}/${uuidv4()}.jpg`;
-    const result = await s3.upload({ Bucket: process.env.AWS_BUCKET_NAME, Key: key, Body: buffer, ContentType: 'image/jpeg' }).promise();
-    return result.Location;
+    try {
+      const key = `${folder}/${uuidv4()}.jpg`;
+      const result = await s3.upload({ 
+        Bucket: process.env.AWS_BUCKET_NAME, 
+        Key: key, 
+        Body: buffer, 
+        ContentType: 'image/jpeg',
+        ACL: 'public-read'
+      }).promise();
+      
+      console.log(`Upload realizado com sucesso: ${result.Location}`);
+      return result.Location;
+    } catch (error) {
+      console.error('Erro no upload para S3:', error.message);
+      throw error;
+    }
   }
 
   async function listar(req, res) {
@@ -48,9 +115,26 @@ function ProdutoController() {
       const dados = { nome, valor, tipo_comercializacao, tipo_produto, estado_id, valor_custo, quantidade };
 
       if (foto_principal && foto_principal.startsWith('data:image')) {
-        const buffer = Buffer.from(foto_principal.split(',')[1], 'base64');
-        const compressed = await compressImage(buffer);
-        dados.foto_principal = await uploadToS3(compressed, 'produtos/principal');
+        try {
+          // Validar base64
+          const base64Data = validateBase64Image(foto_principal);
+          console.log('Processando foto principal, tamanho base64:', base64Data.length);
+          
+          const buffer = Buffer.from(base64Data, 'base64');
+          console.log('Buffer criado, tamanho:', buffer.length);
+          
+          const compressed = await compressImage(buffer);
+          console.log('Imagem comprimida, tamanho:', compressed.length);
+          
+          dados.foto_principal = await uploadToS3(compressed, 'produtos/principal');
+          console.log('Foto principal salva no S3:', dados.foto_principal);
+        } catch (error) {
+          console.error('Erro ao fazer upload da foto principal para S3:', error.message);
+          return res.status(400).json({ 
+            error: `Erro ao processar foto principal: ${error.message}`,
+            details: 'Verifique se a imagem está em formato válido (JPEG, PNG, etc.) e se o base64 está completo'
+          });
+        }
       }
 
       const produto = await produtoRepo.criarProduto(dados);
@@ -58,10 +142,17 @@ function ProdutoController() {
       if (Array.isArray(fotos_secundarias)) {
         for (const base64 of fotos_secundarias) {
           if (base64 && base64.startsWith('data:image')) {
-            const buf = Buffer.from(base64.split(',')[1], 'base64');
-            const comp = await compressImage(buf);
-            const url = await uploadToS3(comp, 'produtos/secundarias');
-            await produtoRepo.adicionarFoto(produto.produto_id, url);
+            try {
+              const base64Data = validateBase64Image(base64);
+              const buf = Buffer.from(base64Data, 'base64');
+              const comp = await compressImage(buf);
+              const url = await uploadToS3(comp, 'produtos/secundarias');
+              await produtoRepo.adicionarFoto(produto.produto_id, url);
+              console.log('Foto secundária salva no S3:', url);
+            } catch (error) {
+              console.error('Erro ao fazer upload da foto secundária para S3:', error.message);
+              // Continuar com as outras fotos mesmo se uma falhar
+            }
           }
         }
       }
@@ -103,11 +194,22 @@ function ProdutoController() {
       if (!imageBase64 || !imageBase64.startsWith('data:image')) {
         return res.status(400).json({ error: 'Imagem inválida' });
       }
-      const buf = Buffer.from(imageBase64.split(',')[1], 'base64');
-      const comp = await compressImage(buf);
-      const url = await uploadToS3(comp, 'produtos/secundarias');
-      const foto = await produtoRepo.adicionarFoto(id, url);
-      res.status(201).json(foto);
+      
+      try {
+        const base64Data = validateBase64Image(imageBase64);
+        const buf = Buffer.from(base64Data, 'base64');
+        const comp = await compressImage(buf);
+        const url = await uploadToS3(comp, 'produtos/secundarias');
+        
+        const foto = await produtoRepo.adicionarFoto(id, url);
+        res.status(201).json(foto);
+      } catch (error) {
+        console.error('Erro ao fazer upload da foto para S3:', error.message);
+        res.status(400).json({ 
+          error: `Erro ao processar imagem: ${error.message}`,
+          details: 'Verifique se a imagem está em formato válido e se o base64 está completo'
+        });
+      }
     } catch (e) {
       console.error('Erro ao adicionar foto:', e);
       res.status(500).json({ error: 'Erro ao adicionar foto' });

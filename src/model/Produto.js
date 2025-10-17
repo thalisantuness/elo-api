@@ -43,7 +43,7 @@ const Produto = sequelize.define(
     //   },
     // },
     foto_principal: {
-      type: Sequelize.STRING,
+      type: Sequelize.TEXT,
       allowNull: true,
     },
     data_cadastro: {

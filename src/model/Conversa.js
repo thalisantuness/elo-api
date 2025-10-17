@@ -28,6 +28,10 @@ const Conversa = sequelize.define(
         key: "usuario_id",
       },
     },
+    frete_id: {
+      type: Sequelize.INTEGER,
+      allowNull: true,
+    },
     ultima_mensagem: {
       type: Sequelize.DATE,
       allowNull: true,

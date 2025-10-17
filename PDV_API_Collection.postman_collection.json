@@ -338,7 +338,31 @@
               "raw": "{{base_url}}/produtos",
               "host": ["{{base_url}}"],
               "path": ["produtos"]
-            }
+            },
+            "description": "Cria um novo produto. Se S3 falhar, fotos são salvas como base64 no banco."
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Produto - Sem Fotos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Produto Simples\",\n  \"valor\": 50.00,\n  \"valor_custo\": 30.00,\n  \"quantidade\": 5,\n  \"tipo_comercializacao\": \"venda\",\n  \"tipo_produto\": \"geral\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/produtos",
+              "host": ["{{base_url}}"],
+              "path": ["produtos"]
+            },
+            "description": "Exemplo de produto sem fotos (mais simples para teste)"
           },
           "response": []
         },
@@ -443,7 +467,62 @@
               "raw": "{{base_url}}/conversas",
               "host": ["{{base_url}}"],
               "path": ["conversas"]
-            }
+            },
+            "description": "Cria uma conversa entre usuários. Permissões:\n- Admin: Pode conversar com qualquer um\n- Empresa: Pode conversar com clientes\n- Cliente: Pode conversar com empresas"
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Conversa - Admin com Cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"frete_id\": 1,\n  \"destinatario_id\": 5\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/conversas",
+              "host": ["{{base_url}}"],
+              "path": ["conversas"]
+            },
+            "description": "Exemplo: Admin conversando com Cliente (ID: 5)"
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Conversa - Admin com Empresa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"frete_id\": 1,\n  \"destinatario_id\": 7\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/conversas",
+              "host": ["{{base_url}}"],
+              "path": ["conversas"]
+            },
+            "description": "Exemplo: Admin conversando com Empresa (ID: 7)"
           },
           "response": []
         },

@@ -2,17 +2,50 @@ const { Produto } = require('../model/Produto');
 const { Foto } = require('../model/Foto');
 
 async function listarProdutos(filtros = {}) {
-  return await Produto.findAll({
+  const produtos = await Produto.findAll({
     where: filtros,
-    // include: [ { model: Estado, as: 'estado', attributes: ['estado_id','nome'] }, { model: Foto, as: 'fotos', attributes: ['photo_id','imageData'] } ],
-    // order: [['data_cadastro','DESC']]
+    include: [{ model: Foto, as: 'fotos', attributes: ['photo_id', 'imageData'] }],
+    order: [['data_cadastro', 'DESC']]
+  });
+
+  // Formatar os dados conforme o padrão da imagem
+  return produtos.map(produto => {
+    const produtoData = produto.toJSON();
+    
+    // Criar array de fotos secundárias no formato correto
+    const photos = produtoData.fotos ? produtoData.fotos.map(foto => ({
+      photo_id: foto.photo_id,
+      imageData: foto.imageData
+    })) : [];
+
+    return {
+      ...produtoData,
+      imageData: produtoData.foto_principal, // foto principal como imageData
+      photos: photos
+    };
   });
 }
 
 async function buscarProdutoPorId(id) {
-  return await Produto.findByPk(id, {
-    // include: [ { model: Estado, as: 'estado', attributes: ['estado_id','nome'] }, { model: Foto, as: 'fotos', attributes: ['photo_id','imageData'] } ]
+  const produto = await Produto.findByPk(id, {
+    include: [{ model: Foto, as: 'fotos', attributes: ['photo_id', 'imageData'] }]
   });
+
+  if (!produto) return null;
+
+  const produtoData = produto.toJSON();
+  
+  // Criar array de fotos secundárias no formato correto
+  const photos = produtoData.fotos ? produtoData.fotos.map(foto => ({
+    photo_id: foto.photo_id,
+    imageData: foto.imageData
+  })) : [];
+
+  return {
+    ...produtoData,
+    imageData: produtoData.foto_principal, // foto principal como imageData
+    photos: photos
+  };
 }
 
 async function criarProduto(dados) {
