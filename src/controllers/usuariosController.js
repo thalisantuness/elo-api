@@ -17,9 +17,9 @@ function UsuarioController() {
       }
 
       // Validar role
-      if (!["cliente", "empresa"].includes(role)) {
+      if (!["cliente", "empresa", "admin"].includes(role)) {
         return res.status(400).json({ 
-          error: "Role inválido. Use 'cliente' ou 'empresa'." 
+          error: "Role inválido. Use 'cliente', 'empresa' ou 'admin'." 
         });
       }
 
@@ -122,14 +122,45 @@ function UsuarioController() {
   async function listar(req, res) {
     try {
       const { role: userRole } = req.user;
+      let whereClause = {
+        usuario_id: { [Op.ne]: req.user.usuario_id } // Excluir o próprio usuário
+      };
 
-      // Lista usuários do role oposto ao do usuário logado
-      const targetRole = userRole === 'cliente' ? 'empresa' : 'cliente';
+      // Definir quais roles o usuário pode ver baseado no seu role
+      switch (userRole) {
+        case 'admin':
+          // Admin vê todos os usuários (incluindo outros admins)
+          console.log('🔑 Admin logado - mostrando todos os usuários');
+          break;
+          
+        case 'empresa':
+          // Empresa vê empresas e clientes (não vê admins)
+          whereClause.role = { [Op.in]: ['empresa', 'cliente'] };
+          console.log('🏢 Empresa logada - mostrando empresas e clientes');
+          break;
+          
+        case 'cliente':
+          // Cliente vê apenas empresas (não vê admins nem outras empresas)
+          whereClause.role = 'empresa';
+          console.log('👤 Cliente logado - mostrando apenas empresas');
+          break;
+          
+        default:
+          return res.status(403).json({ error: 'Role não autorizado' });
+      }
 
-      const usuarios = await usuariosRepository.listarUsuarios({
-        role: targetRole,
-        usuario_id: { [Op.ne]: req.user.usuario_id }  // Usei Op.ne em vez de Sequelize.Op.ne
-      });
+      const usuarios = await usuariosRepository.listarUsuarios(whereClause);
+
+      // Se não encontrar usuários, retornar array vazio com mensagem explicativa
+      if (usuarios.length === 0) {
+        const roleMessage = userRole === 'admin' ? 'usuários' : 
+                           userRole === 'empresa' ? 'empresas e clientes' : 'empresas';
+        
+        return res.json({
+          message: `Nenhum ${roleMessage} encontrado.`,
+          usuarios: []
+        });
+      }
 
       res.json(
         usuarios.map((u) => {
