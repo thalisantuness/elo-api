@@ -1,0 +1,547 @@
+{
+  "info": {
+    "name": "PDV API Collection",
+    "description": "Collection para API do sistema PDV - Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:4000",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Autenticação",
+      "item": [
+        {
+          "name": "Cadastrar Usuário",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"João Silva\",\n  \"telefone\": \"11999999999\",\n  \"email\": \"joao@email.com\",\n  \"senha\": \"123456\",\n  \"role\": \"cliente\",\n  \"foto_perfil\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/cadastrar",
+              "host": ["{{base_url}}"],
+              "path": ["cadastrar"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"joao@email.com\",\n  \"senha\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/login",
+              "host": ["{{base_url}}"],
+              "path": ["login"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Usuários",
+      "item": [
+        {
+          "name": "Listar Usuários",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/usuarios",
+              "host": ["{{base_url}}"],
+              "path": ["usuarios"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Usuário por ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/usuarios/1",
+              "host": ["{{base_url}}"],
+              "path": ["usuarios", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Usuário",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"João Silva Atualizado\",\n  \"telefone\": \"11888888888\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/usuarios/1",
+              "host": ["{{base_url}}"],
+              "path": ["usuarios", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Perfil",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"João Silva Perfil\",\n  \"telefone\": \"11777777777\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/usuarios/1/perfil",
+              "host": ["{{base_url}}"],
+              "path": ["usuarios", "1", "perfil"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Alterar Senha",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senhaAtual\": \"123456\",\n  \"novaSenha\": \"654321\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/usuarios/1/senha",
+              "host": ["{{base_url}}"],
+              "path": ["usuarios", "1", "senha"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Foto de Perfil",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foto_perfil\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/usuarios/1/foto",
+              "host": ["{{base_url}}"],
+              "path": ["usuarios", "1", "foto"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Deletar Usuário",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/usuarios/1",
+              "host": ["{{base_url}}"],
+              "path": ["usuarios", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Produtos",
+      "item": [
+        {
+          "name": "Listar Produtos",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/produtos",
+              "host": ["{{base_url}}"],
+              "path": ["produtos"],
+              "query": [
+                {
+                  "key": "tipo_produto",
+                  "value": "eletronico",
+                  "disabled": true
+                },
+                {
+                  "key": "tipo_comercializacao",
+                  "value": "venda",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Produto por ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/produtos/1",
+              "host": ["{{base_url}}"],
+              "path": ["produtos", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Produto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Smartphone Samsung\",\n  \"valor\": 1200.00,\n  \"valor_custo\": 800.00,\n  \"quantidade\": 10,\n  \"tipo_comercializacao\": \"venda\",\n  \"tipo_produto\": \"eletronico\",\n  \"estado_id\": 1,\n  \"foto_principal\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\",\n  \"fotos_secundarias\": [\n    \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\",\n    \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/produtos",
+              "host": ["{{base_url}}"],
+              "path": ["produtos"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Produto",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Smartphone Samsung Galaxy\",\n  \"valor\": 1300.00,\n  \"quantidade\": 15\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/produtos/1",
+              "host": ["{{base_url}}"],
+              "path": ["produtos", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Adicionar Foto ao Produto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"imageBase64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/produtos/1/fotos",
+              "host": ["{{base_url}}"],
+              "path": ["produtos", "1", "fotos"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Deletar Produto",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/produtos/1",
+              "host": ["{{base_url}}"],
+              "path": ["produtos", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Chat",
+      "item": [
+        {
+          "name": "Listar Conversas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/conversas",
+              "host": ["{{base_url}}"],
+              "path": ["conversas"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Conversa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"frete_id\": 1,\n  \"destinatario_id\": 2\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/conversas",
+              "host": ["{{base_url}}"],
+              "path": ["conversas"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Mensagens da Conversa",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/conversas/1/mensagens",
+              "host": ["{{base_url}}"],
+              "path": ["conversas", "1", "mensagens"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Marcar Mensagem como Lida",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mensagens/1/lida",
+              "host": ["{{base_url}}"],
+              "path": ["mensagens", "1", "lida"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Vendas",
+      "description": "Rotas de vendas (não implementadas no routes.js mas disponíveis no controller)",
+      "item": [
+        {
+          "name": "Listar Vendas",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/vendas",
+              "host": ["{{base_url}}"],
+              "path": ["vendas"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Venda por ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/vendas/1",
+              "host": ["{{base_url}}"],
+              "path": ["vendas", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Venda",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usuario_id\": 1,\n  \"status\": \"finalizada\",\n  \"itens\": [\n    {\n      \"produto_id\": 1,\n      \"quantidade\": 2,\n      \"preco_unitario\": 1200.00\n    },\n    {\n      \"produto_id\": 2,\n      \"quantidade\": 1,\n      \"preco_unitario\": 500.00\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/vendas",
+              "host": ["{{base_url}}"],
+              "path": ["vendas"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar Venda",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{base_url}}/vendas/1/cancelar",
+              "host": ["{{base_url}}"],
+              "path": ["vendas", "1", "cancelar"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Deletar Venda",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/vendas/1",
+              "host": ["{{base_url}}"],
+              "path": ["vendas", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Script para executar antes de cada request"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Script para executar após cada request",
+          "// Exemplo: salvar token automaticamente após login",
+          "if (pm.response.code === 200 && pm.request.url.path.includes('login')) {",
+          "    const responseJson = pm.response.json();",
+          "    if (responseJson.token) {",
+          "        pm.collectionVariables.set('auth_token', responseJson.token);",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ]
+}
