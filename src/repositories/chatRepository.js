@@ -4,23 +4,24 @@ const { Conversa } = require("../model/Conversa");
 const { Mensagem } = require("../model/Mensagem");
 const sequelize = require("../utils/db");
 
-async function criarConversaSeNaoExistir(usuario1_id, usuario2_id, frete_id) {
+async function criarConversaSeNaoExistir(usuario1_id, usuario2_id) {
   return await sequelize.transaction(async (t) => {
+    // Buscar conversa existente entre os dois usuários
     let conversa = await Conversa.findOne({
-      where: { frete_id },
+      where: {
+        [Sequelize.Op.or]: [
+          { usuario1_id, usuario2_id },
+          { usuario1_id: usuario2_id, usuario2_id: usuario1_id }
+        ]
+      },
       transaction: t,
     });
 
     if (!conversa) {
-     
-
-    
-
       conversa = await Conversa.create(
         {
           usuario1_id,
           usuario2_id,
-          frete_id,
           ultima_mensagem: new Date(),
         },
         { transaction: t }

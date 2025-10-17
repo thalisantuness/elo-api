@@ -33,12 +33,12 @@ function ChatSocketController(io) {
     socket.join(`user:${socket.user.usuario_id}`);
 
     socket.on("sendMessage", async (data) => {
-      const { destinatario_id, conteudo, frete_id } = data;
+      const { destinatario_id, conteudo } = data;
 
       try {
         // Validar entrada
-        if (!destinatario_id || !conteudo || !frete_id) {
-          throw new Error("Dados incompletos: destinatario_id, conteudo e frete_id são obrigatórios");
+        if (!destinatario_id || !conteudo) {
+          throw new Error("Dados incompletos: destinatario_id e conteudo são obrigatórios");
         }
 
         // Verificar destinatário
@@ -58,8 +58,7 @@ function ChatSocketController(io) {
         // Criar ou obter conversa
         const conversa = await chatRepository.criarConversaSeNaoExistir(
           socket.user.usuario_id,
-          destinatario_id,
-          frete_id
+          destinatario_id
         );
 
         // Salvar mensagem no banco de dados

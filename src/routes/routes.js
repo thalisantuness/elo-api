@@ -57,12 +57,12 @@ router.put("/mensagens/:mensagem_id/lida", authMiddleware, chatController.marcar
 
 router.post("/conversas", authMiddleware, async (req, res) => {
   try {
-    const { frete_id, destinatario_id } = req.body;
+    const { destinatario_id } = req.body;
     const usuario_id = req.user.usuario_id;
 
-    if (!frete_id || !destinatario_id) {
+    if (!destinatario_id) {
       return res.status(400).json({ 
-        error: "frete_id e destinatario_id são obrigatórios" 
+        error: "destinatario_id é obrigatório" 
       });
     }
 
@@ -83,8 +83,7 @@ router.post("/conversas", authMiddleware, async (req, res) => {
     // Criar ou recuperar conversa
     const conversa = await chatRepository.criarConversaSeNaoExistir(
       usuario_id,
-      destinatario_id,
-      frete_id
+      destinatario_id
     );
 
     // Buscar detalhes dos participantes
@@ -101,7 +100,6 @@ router.post("/conversas", authMiddleware, async (req, res) => {
         conversa_id: conversa.conversa_id,
         usuario1_id: conversa.usuario1_id,
         usuario2_id: conversa.usuario2_id,
-        frete_id: conversa.frete_id,
         ultima_mensagem: conversa.ultima_mensagem,
         Usuario1: usuario1,
         Usuario2: usuario2,
