@@ -1,7 +1,7 @@
 const { Sequelize, DataTypes } = require('sequelize');
 const sequelize = require('../utils/db');
-const {Produto} = require('./Produto'); 
 const {Usuario} = require('./Usuarios');
+const { Produto } = require('./Produto');
 
 const Venda = sequelize.define('Venda', {
   venda_id: {
@@ -13,7 +13,7 @@ const Venda = sequelize.define('Venda', {
     type: DataTypes.INTEGER,
     allowNull: false,
     references: {
-      model: 'usuarios', // Nome da tabela no banco de dados
+      model: 'usuarios', 
       key: 'usuario_id',
     },
   },
@@ -35,46 +35,7 @@ const Venda = sequelize.define('Venda', {
   timestamps: false,
 });
 
-const ItemVenda = sequelize.define('ItemVenda', {
-  item_venda_id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true,
-  },
-  venda_id: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'venda',
-      key: 'venda_id',
-    },
-  },
-  produto_id: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: 'produto',
-      key: 'produto_id',
-    },
-  },
-  quantidade: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 1,
-  },
-  preco_unitario: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-  },
-  subtotal: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-  },
-}, {
-  schema: 'public',
-  tableName: 'item_venda',
-  timestamps: false,
-});
+
 
 // Relacionamentos
 Venda.belongsTo(Usuario, {
@@ -82,14 +43,11 @@ Venda.belongsTo(Usuario, {
   as: 'usuario',
 });
 
-Venda.hasMany(ItemVenda, {
-  foreignKey: 'venda_id',
-  as: 'itens',
-});
+
 
 ItemVenda.belongsTo(Produto, {
   foreignKey: 'produto_id',
   as: 'produto',
 });
 
-module.exports = { Venda, ItemVenda };
+module.exports = { Venda };

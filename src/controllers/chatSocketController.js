@@ -1,6 +1,5 @@
 const { Conversa } = require("../model/Conversa");
 const { Mensagem } = require("../model/Mensagem");
-const { Frete } = require("../model/Frete");
 const { Usuario } = require("../model/Usuarios");
 const { Sequelize } = require("sequelize");
 const chatRepository = require("../repositories/chatRepository");
@@ -27,34 +26,15 @@ function ChatSocketController(io) {
           throw new Error("Destinatário não encontrado");
         }
 
-        // Verificar papéis (motorista <-> empresa)
+     
         if (
-          (socket.user.role === "motorista" && destinatario.role !== "empresa") ||
-          (socket.user.role === "empresa" && destinatario.role !== "motorista")
+          (socket.user.role === "cliente" && destinatario.role !== "empresa") ||
+          (socket.user.role === "empresa" && destinatario.role !== "cliente")
         ) {
-          throw new Error("Conversas só são permitidas entre motoristas e empresas");
+          throw new Error("Conversas só são permitidas entre clientes e empresas");
         }
 
-        // Verificar se há frete vinculando os usuários
-        const frete = await Frete.findOne({
-          where: {
-            frete_id,
-            [Sequelize.Op.or]: [
-              {
-                empresa_id: socket.user.usuario_id,
-                motorista_id: destinatario_id,
-              },
-              {
-                empresa_id: destinatario_id,
-                motorista_id: socket.user.usuario_id,
-              },
-            ],
-          },
-        });
-
-        if (!frete) {
-          throw new Error("Não há frete vinculando estes usuários");
-        }
+    
 
         // Criar ou obter conversa
         const conversa = await chatRepository.criarConversaSeNaoExistir(

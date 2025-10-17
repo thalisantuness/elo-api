@@ -10,7 +10,7 @@ const Usuario = sequelize.define(
       autoIncrement: true,
     },
     role: {
-      type: Sequelize.ENUM("motorista", "empresa"),
+      type: Sequelize.STRING,
       allowNull: false,
     },
     nome: {

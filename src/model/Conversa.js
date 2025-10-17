@@ -1,7 +1,7 @@
 const { Sequelize } = require("sequelize");
 const sequelize = require("../utils/db");
 const { Usuario } = require("./Usuarios");
-const { Frete } = require("./Frete");
+
 
 const Conversa = sequelize.define(
   "Conversa",
@@ -19,16 +19,7 @@ const Conversa = sequelize.define(
         key: "usuario_id",
       },
     },
-    frete_id: {
-      type: Sequelize.INTEGER,
-      allowNull: false,
-      references: {
-        model: "fretes",
-        key: "frete_id",
-      },
-      onUpdate: 'CASCADE',
-      onDelete: 'CASCADE', // Adiciona exclusão em cascata
-    },
+
     usuario2_id: {
       type: Sequelize.INTEGER,
       allowNull: false,
@@ -51,6 +42,5 @@ const Conversa = sequelize.define(
 
 Conversa.belongsTo(Usuario, { foreignKey: "usuario1_id", as: "Usuario1" });
 Conversa.belongsTo(Usuario, { foreignKey: "usuario2_id", as: "Usuario2" });
-Conversa.belongsTo(Frete, { foreignKey: "frete_id", as: "Frete" });
 
 module.exports = { Conversa };

@@ -5,34 +5,29 @@ const authMiddleware = require("../middleware/auth");
 const chatRepository = require("../repositories/chatRepository");
 const { Usuario } = require("../model/Usuarios");
 
-const UsuarioController = require("../controllers/usuarioController");
-const usuarioController = UsuarioController();
+const UsuarioController = require("../controllers/usuariosController");
+const usuariosController = UsuarioController();
 const ChatController = require("../controllers/chatController");
 const chatController = ChatController();
-const FreteController = require("../controllers/freteController");
-const freteController = FreteController();
-const SolicitacaoController = require("../controllers/solicitacaoController");
-const solicitacaoController = SolicitacaoController();
-const ProdutoNovoController = require("../controllers/produtoNovoController");
-const produtoNovoController = ProdutoNovoController();
+const ProdutoController = require("../controllers/produtoController");
+const produtoController = ProdutoController();
 
-// Rotas de Usuários
-router.post("/cadastrar", usuarioController.cadastrar);
-router.post("/login", usuarioController.logar);
-router.get("/usuarios", authMiddleware, usuarioController.listar);
-router.get("/usuarios/:id", usuarioController.buscarPorId);
-router.put("/usuarios/:id", usuarioController.atualizar);
-router.patch("/usuarios/:id/perfil", authMiddleware, usuarioController.atualizarPerfil);
-router.patch("/usuarios/:id/senha", authMiddleware, usuarioController.alterarSenha);
-router.patch("/usuarios/:id/foto", authMiddleware, usuarioController.atualizarFotoPerfil);
-router.delete("/usuarios/:id", usuarioController.deletar);
+router.post("/cadastrar", usuariosController.cadastrar);
+router.post("/login", usuariosController.logar);
+router.get("/usuarios", authMiddleware, usuariosController.listar);
+router.get("/usuarios/:id", usuariosController.buscarPorId);
+router.put("/usuarios/:id", usuariosController.atualizar);
+router.patch("/usuarios/:id/perfil", authMiddleware, usuariosController.atualizarPerfil);
+router.patch("/usuarios/:id/senha", authMiddleware, usuariosController.alterarSenha);
+router.patch("/usuarios/:id/foto", authMiddleware, usuariosController.atualizarFotoPerfil);
+router.delete("/usuarios/:id", usuariosController.deletar);
 
-// Rotas de Fretes
-router.post("/fretes", authMiddleware, freteController.criar);
-router.get("/fretes", authMiddleware, freteController.listar);
-router.get("/fretes/:id", freteController.buscarPorId);
-router.put("/fretes/:id", authMiddleware, freteController.atualizar);
-router.delete("/fretes/:id", authMiddleware, freteController.deletar);
+router.get("/produtos", produtoController.listar);
+router.get("/produtos/:id", produtoController.buscarPorId);
+router.post("/produtos", produtoController.criar);
+router.put("/produtos/:id", produtoController.atualizar);
+router.delete("/produtos/:id", produtoController.deletar);
+router.post("/produtos/:id/fotos", produtoController.adicionarFoto);
 
 // Rotas de Chat
 router.get("/conversas", authMiddleware, chatController.listarConversas);
@@ -56,13 +51,13 @@ router.post("/conversas", authMiddleware, async (req, res) => {
       return res.status(404).json({ error: "Destinatário não encontrado" });
     }
 
-    // Validar roles (motorista só pode falar com empresa e vice-versa)
+    // Validar roles (cliente só pode falar com empresa e vice-versa)
     if (
-      (req.user.role === "motorista" && destinatario.role !== "empresa") ||
-      (req.user.role === "empresa" && destinatario.role !== "motorista")
+      (req.user.role === "cliente" && destinatario.role !== "empresa") ||
+      (req.user.role === "empresa" && destinatario.role !== "cliente")
     ) {
       return res.status(400).json({
-        error: "Conversas só são permitidas entre motoristas e empresas",
+        error: "Conversas só são permitidas entre clientes e empresas",
       });
     }
 
@@ -98,19 +93,5 @@ router.post("/conversas", authMiddleware, async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 });
-
-// Rotas de Solicitações
-router.post("/solicitacoes", authMiddleware, solicitacaoController.solicitar);
-router.get("/solicitacoes/empresa", authMiddleware, solicitacaoController.listarPorEmpresa);
-router.get("/solicitacoes/motorista", authMiddleware, solicitacaoController.listarPorMotorista);
-router.put("/solicitacoes/:id/responder", authMiddleware, solicitacaoController.responder);
-
-// Rotas de Produtos (novo)
-router.get("/produtos", produtoNovoController.listar);
-router.get("/produtos/:id", produtoNovoController.buscarPorId);
-router.post("/produtos", produtoNovoController.criar);
-router.put("/produtos/:id", produtoNovoController.atualizar);
-router.delete("/produtos/:id", produtoNovoController.deletar);
-router.post("/produtos/:id/fotos", produtoNovoController.adicionarFoto);
 
 module.exports = router;

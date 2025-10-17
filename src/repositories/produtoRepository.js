@@ -1,76 +1,43 @@
 const { Produto } = require('../model/Produto');
+const { Foto } = require('../model/Foto');
 
-async function listarProdutos() {
+async function listarProdutos(filtros = {}) {
   return await Produto.findAll({
-    order: [['nome', 'ASC']]
+    where: filtros,
+    // include: [ { model: Estado, as: 'estado', attributes: ['estado_id','nome'] }, { model: Foto, as: 'fotos', attributes: ['photo_id','imageData'] } ],
+    // order: [['data_cadastro','DESC']]
   });
 }
 
 async function buscarProdutoPorId(id) {
-  return await Produto.findByPk(id);
-}
-
-async function criarProduto(dadosProduto) {
-  const { nome, preco, preco_venda, quantidade, data_vencimento } = dadosProduto;
-
-  // Validações básicas
-  if (!nome || !preco || !preco_venda || !quantidade) {
-    throw new Error('Nome, preço, preço de venda e quantidade são obrigatórios');
-  }
-
-  const produto = await Produto.create({ 
-    nome, 
-    preco, 
-    preco_venda, 
-    quantidade, 
-    data_vencimento 
+  return await Produto.findByPk(id, {
+    // include: [ { model: Estado, as: 'estado', attributes: ['estado_id','nome'] }, { model: Foto, as: 'fotos', attributes: ['photo_id','imageData'] } ]
   });
-  return produto;
 }
 
-async function atualizarProduto(id, dadosAtualizados) {
+async function criarProduto(dados) {
+  return await Produto.create(dados);
+}
+
+async function atualizarProduto(id, dados) {
   const produto = await Produto.findByPk(id);
-
-  if (!produto) {
-    throw new Error('Produto não encontrado');
-  }
-
-  // Valida se está tentando atualizar a quantidade para valor negativo
-  if (dadosAtualizados.quantidade !== undefined && dadosAtualizados.quantidade < 0) {
-    throw new Error('Quantidade não pode ser negativa');
-  }
-
-  await produto.update(dadosAtualizados);
+  if (!produto) throw new Error('Produto não encontrado');
+  await produto.update(dados);
   return produto;
 }
 
 async function deletarProduto(id) {
-  const produto = await Produto.findByPk(id);
-
-  if (!produto) {
-    throw new Error('Produto não encontrado');
+  const produto = await Produto.findByPk(id, { include: [{ model: Foto, as: 'fotos' }] });
+  if (!produto) throw new Error('Produto não encontrado');
+  if (produto.fotos?.length) {
+    await Foto.destroy({ where: { produto_id: id } });
   }
-
   await produto.destroy();
   return { message: 'Produto deletado com sucesso' };
 }
 
-// Método adicional específico para Produto
-async function atualizarEstoque(id, quantidade) {
-  const produto = await Produto.findByPk(id);
-
-  if (!produto) {
-    throw new Error('Produto não encontrado');
-  }
-
-  const novaQuantidade = produto.quantidade + quantidade;
-  
-  if (novaQuantidade < 0) {
-    throw new Error('Quantidade em estoque não pode ser negativa');
-  }
-
-  await produto.update({ quantidade: novaQuantidade });
-  return produto;
+async function adicionarFoto(produto_id, imageData) {
+  return await Foto.create({ produto_id, imageData });
 }
 
 module.exports = {
@@ -79,5 +46,7 @@ module.exports = {
   criarProduto,
   atualizarProduto,
   deletarProduto,
-  atualizarEstoque
+  adicionarFoto,
 };
+
+

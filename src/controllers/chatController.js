@@ -1,6 +1,5 @@
 const chatRepository = require("../repositories/chatRepository");
 const { Conversa } = require("../model/Conversa");
-const { Frete } = require("../model/Frete");
 const { Usuario } = require("../model/Usuarios");
 const { Sequelize } = require("sequelize");
 //
@@ -51,54 +50,11 @@ function ChatController() {
     }
   }
 
-  async function listarConversasComFretes(usuario_id) {
-    try {
-      const userId = typeof usuario_id === "object" ? usuario_id.usuario_id : usuario_id;
-      console.log("Buscando conversas para usuario_id:", userId); // Log para depuração
-      return await Conversa.findAll({
-        where: {
-          [Sequelize.Op.or]: [{ usuario1_id: userId }, { usuario2_id: userId }],
-        },
-        include: [
-          {
-            model: Frete,
-            as: "Frete",
-            required: true,
-            include: [
-              {
-                association: "Empresa",
-                attributes: ["usuario_id", "nome_completo", "imagem_perfil"],
-              },
-              {
-                association: "Motorista",
-                attributes: ["usuario_id", "nome_completo", "imagem_perfil"],
-              },
-            ],
-          },
-          {
-            model: Usuario,
-            as: "Usuario1",
-            attributes: ["usuario_id", "nome_completo", "imagem_perfil", "role"],
-          },
-          {
-            model: Usuario,
-            as: "Usuario2",
-            attributes: ["usuario_id", "nome_completo", "imagem_perfil", "role"],
-          },
-        ],
-        order: [["ultima_mensagem", "DESC"]],
-      });
-    } catch (error) {
-      console.error("Erro em listarConversasComFretes:", error);
-      throw error;
-    }
-  }
-
+  
   return {
     listarConversas,
     listarMensagens,
     marcarComoLida,
-    listarConversasComFretes,
   };
 }
 

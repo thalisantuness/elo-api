@@ -2,7 +2,6 @@ const { Sequelize } = require("sequelize");
 const { Usuario } = require("../model/Usuarios");
 const { Conversa } = require("../model/Conversa");
 const { Mensagem } = require("../model/Mensagem");
-const { Frete } = require("../model/Frete");
 const sequelize = require("../utils/db");
 
 async function criarConversaSeNaoExistir(usuario1_id, usuario2_id, frete_id) {
@@ -13,20 +12,9 @@ async function criarConversaSeNaoExistir(usuario1_id, usuario2_id, frete_id) {
     });
 
     if (!conversa) {
-      const frete = await Frete.findOne({
-        where: {
-          frete_id,
-          [Sequelize.Op.or]: [
-            { empresa_id: usuario1_id, motorista_id: usuario2_id },
-            { empresa_id: usuario2_id, motorista_id: usuario1_id },
-          ],
-        },
-        transaction: t,
-      });
+     
 
-      if (!frete) {
-        throw new Error("Frete não encontrado ou usuários não vinculados");
-      }
+    
 
       conversa = await Conversa.create(
         {
@@ -60,19 +48,7 @@ async function listarConversas(usuario_id) {
         attributes: ["usuario_id", "nome_completo", "imagem_perfil", "role"],
       },
       {
-        model: Frete,
-        as: "Frete",
-        attributes: ["frete_id", "status"],
-        include: [
-          {
-            association: "Empresa",
-            attributes: ["usuario_id", "nome_completo"],
-          },
-          {
-            association: "Motorista",
-            attributes: ["usuario_id", "nome_completo"],
-          },
-        ],
+       
       },
     ],
     order: [["ultima_mensagem", "DESC"]],

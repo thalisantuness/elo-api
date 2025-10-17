@@ -1,99 +1,367 @@
-const { Usuario } = require('../model/Usuarios');
-const usuariosRepository = require('../repositories/usuariosRepository');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const authConfig = require('../config/auth.json');
-const sharp = require('sharp');
+const usuariosRepository = require("../repositories/usuariosRepository");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const authConfig = require("../config/auth.json");
+const { Sequelize, Op } = require("sequelize");  // Adicionei Op aqui para usar em listar
 
 function UsuarioController() {
-
-  async function visualizarUsuario(req, res) {
-    try {
-      const usuarios = await usuariosRepository.listarUsuarios();
-
-      if (usuarios.length === 0) {
-        return res.status(404).json({ error: 'Nenhum usuário encontrado' });
-      }
-
-      const usuariosComImagem = usuarios.map(usuario => {
-        const imageBase64 = usuario.imageData
-          ? Buffer.from(usuario.imageData).toString('base64')
-          : null;
-
-        return {
-          ...usuario.toJSON(),
-          image: imageBase64 ? `data:image/png;base64,${imageBase64}` : null,
-        };
-      });
-
-      res.json(usuariosComImagem);
-    } catch (error) {
-      console.error('Erro ao obter usuários:', error);
-      res.status(500).json({ error: 'Erro ao obter usuários' });
-    }
-  }
-
-
-
   async function cadastrar(req, res) {
     try {
-      const { nome, email, senha } = req.body;
-  
-      if (!nome || !email || !senha) {
-        return res.status(400).json({ error: 'Nome, email, senha são obrigatórios.' });
+      const { nome, telefone, email, senha, role, foto_perfil } = req.body;
+
+      // Validações básicas
+      if (!nome || !telefone || !email || !senha || !role) {
+        return res.status(400).json({ 
+          error: "Nome, telefone, email, senha e role são obrigatórios" 
+        });
       }
-  
-      // Envie a senha pura, o hash será feito no repository aqui
-      const usuario = await usuariosRepository.criarUsuario({
-        nome,
-        email,
-        senha
+
+      // Validar role
+      if (!["cliente", "empresa"].includes(role)) {
+        return res.status(400).json({ 
+          error: "Role inválido. Use 'cliente' ou 'empresa'." 
+        });
+      }
+
+      // Verificar se o email já existe
+      const usuarioExistente = await usuariosRepository.buscarUsuarioPorEmail(email);
+      if (usuarioExistente) {
+        return res.status(400).json({ error: "Email já cadastrado" });
+      }
+
+      // Validar formato do telefone (10 ou 11 dígitos)
+      const telefoneLimpo = telefone.replace(/\D/g, '');
+      if (!/^\d{10,11}$/.test(telefoneLimpo)) {
+        return res.status(400).json({ 
+          error: "Telefone inválido. Use apenas números (10 ou 11 dígitos)." 
+        });
+      }
+
+      // Validar formato da foto (se fornecida)
+      if (foto_perfil && !foto_perfil.startsWith('data:image')) {
+        return res.status(400).json({ 
+          error: "Formato inválido para a foto de perfil" 
+        });
+      }
+
+      // Criar usuário
+      const usuarioCriado = await usuariosRepository.criarUsuario({
+        usuario: {
+          nome,
+          telefone: telefoneLimpo,
+          email,
+          senha,
+          role
+        },
+        fotoPerfilBase64: foto_perfil
       });
-  
-      res.json({ message: `Usuário ${nome} cadastrado com sucesso!` });
+
+      const usuarioRetorno = usuarioCriado.toJSON();
+      delete usuarioRetorno.senha;
+
+      res.status(201).json({
+        message: "Usuário cadastrado com sucesso",
+        usuario: usuarioRetorno
+      });
     } catch (error) {
-      console.error('Erro ao cadastrar usuário:', error);
-      res.status(500).json({ errorMessage: 'Erro ao cadastrar usuário', error: error.message });
+      console.error("Erro no cadastro:", error);
+      res.status(500).json({
+        error: "Erro ao cadastrar usuário",
+        details: error.message
+      });
     }
   }
-  
 
   async function logar(req, res) {
     try {
       const { email, senha } = req.body;
 
       if (!email || !senha) {
-        return res.status(400).json({ message: 'Email e senha são obrigatórios.' });
+        return res.status(400).json({ error: "Email e senha são obrigatórios" });
       }
 
-      const user = await Usuario.findOne({ where: { email: email } });
-
-      if (!user) {
-        return res.status(401).json({ message: 'Email não encontrado.' });
+      const usuario = await usuariosRepository.buscarUsuarioPorEmail(email);
+      if (!usuario) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
       }
 
-      const isMatch = await bcrypt.compare(senha, user.senha);
-
-      if (!isMatch) {
-        return res.status(401).json({ message: 'Senha incorreta.' });
+      const senhaValida = await bcrypt.compare(senha, usuario.senha);
+      if (!senhaValida) {
+        return res.status(401).json({ error: "Senha incorreta" });
       }
 
-      const token = jwt.sign({
-        usuario_id: user.usuario_id,
-        role: user.role,
-      }, authConfig.secret, { expiresIn: 86400 });
+      const token = jwt.sign(
+        {
+          usuario_id: usuario.usuario_id,
+          role: usuario.role,
+          email: usuario.email
+        },
+        authConfig.secret,
+        { expiresIn: "24h" }
+      );
 
-      res.send({ user, token });
+      const resposta = {
+        usuario: {
+          usuario_id: usuario.usuario_id,
+          email: usuario.email,
+          role: usuario.role,
+          nome: usuario.nome,
+          telefone: usuario.telefone,
+          foto_perfil: usuario.foto_perfil
+        },
+        token
+      };
+
+      res.json(resposta);
     } catch (error) {
-      console.error('Erro ao autenticar usuário:', error);
-      res.status(500).json({ errorMessage: 'Erro ao autenticar usuário', error: error.message });
+      console.error("Erro no login:", error);
+      res.status(500).json({ error: "Erro no login" });
+    }
+  }
+
+  async function listar(req, res) {
+    try {
+      const { role: userRole } = req.user;
+
+      // Lista usuários do role oposto ao do usuário logado
+      const targetRole = userRole === 'cliente' ? 'empresa' : 'cliente';
+
+      const usuarios = await usuariosRepository.listarUsuarios({
+        role: targetRole,
+        usuario_id: { [Op.ne]: req.user.usuario_id }  // Usei Op.ne em vez de Sequelize.Op.ne
+      });
+
+      res.json(
+        usuarios.map((u) => {
+          const usuario = u.toJSON();
+          delete usuario.senha;
+          return {
+            usuario_id: usuario.usuario_id,
+            nome: usuario.nome,
+            telefone: usuario.telefone,
+            email: usuario.email,
+            role: usuario.role,
+            foto_perfil: usuario.foto_perfil
+          };
+        })
+      );
+    } catch (error) {
+      console.error("Erro ao listar usuários:", error);
+      res.status(500).json({ error: "Erro ao listar usuários" });
+    }
+  }
+
+  async function buscarPorId(req, res) {
+    try {
+      const { id } = req.params;
+      const usuario = await usuariosRepository.buscarUsuarioPorId(id);
+
+      if (!usuario) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+
+      const usuarioRetorno = usuario.toJSON();
+      delete usuarioRetorno.senha;
+
+      res.json(usuarioRetorno);
+    } catch (error) {
+      console.error("Erro ao buscar usuário:", error);
+      res.status(500).json({ error: "Erro ao buscar usuário" });
+    }
+  }
+
+  async function atualizar(req, res) {
+    try {
+      const { id } = req.params;
+      const dadosAtualizacao = req.body;
+
+      // Não permitir atualização de campos críticos
+      delete dadosAtualizacao.senha;
+      delete dadosAtualizacao.usuario_id;
+      delete dadosAtualizacao.role;
+      delete dadosAtualizacao.foto_perfil; // Atualizar foto por endpoint separado
+
+      // Validar telefone se fornecido
+      if (dadosAtualizacao.telefone) {
+        const telefoneLimpo = dadosAtualizacao.telefone.replace(/\D/g, '');
+        if (!/^\d{10,11}$/.test(telefoneLimpo)) {
+          return res.status(400).json({ 
+            error: "Telefone inválido. Use apenas números (10 ou 11 dígitos)." 
+          });
+        }
+        dadosAtualizacao.telefone = telefoneLimpo;
+      }
+
+      const [updated] = await usuariosRepository.atualizarUsuario(id, dadosAtualizacao);
+
+      if (!updated) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+
+      const usuarioAtualizado = await usuariosRepository.buscarUsuarioPorId(id);
+      const usuarioRetorno = usuarioAtualizado.toJSON();
+      delete usuarioRetorno.senha;
+
+      res.json({
+        message: "Usuário atualizado com sucesso",
+        usuario: usuarioRetorno
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar usuário:", error);
+      res.status(500).json({ error: "Erro ao atualizar usuário" });
+    }
+  }
+
+  async function atualizarPerfil(req, res) {
+    try {
+      const { id } = req.params;
+      const dadosAtualizacao = req.body;
+      const usuarioLogadoId = req.user.usuario_id;
+
+      // Verificar se o usuário está atualizando seu próprio perfil
+      if (parseInt(id, 10) !== usuarioLogadoId) {
+        return res.status(403).json({ error: "Não autorizado a editar este perfil." });
+      }
+
+      // Não permitir atualização de campos críticos
+      delete dadosAtualizacao.senha;
+      delete dadosAtualizacao.role;
+      delete dadosAtualizacao.usuario_id;
+      delete dadosAtualizacao.foto_perfil; // Atualizar foto por endpoint separado
+
+      // Validar telefone se fornecido
+      if (dadosAtualizacao.telefone) {
+        const telefoneLimpo = dadosAtualizacao.telefone.replace(/\D/g, '');
+        if (!/^\d{10,11}$/.test(telefoneLimpo)) {
+          return res.status(400).json({ 
+            error: "Telefone inválido. Use apenas números (10 ou 11 dígitos)." 
+          });
+        }
+        dadosAtualizacao.telefone = telefoneLimpo;
+      }
+
+      const usuarioAtualizado = await usuariosRepository.atualizarPerfil(id, dadosAtualizacao);
+
+      if (!usuarioAtualizado) {
+        return res.status(404).json({ 
+          error: "Usuário não encontrado ou nenhuma alteração realizada." 
+        });
+      }
+
+      const usuarioRetorno = usuarioAtualizado.toJSON();
+      delete usuarioRetorno.senha;
+
+      res.json({
+        message: "Perfil atualizado com sucesso!",
+        usuario: usuarioRetorno
+      });
+
+    } catch (error) {
+      console.error("Erro ao atualizar perfil:", error);
+      res.status(500).json({ error: "Erro interno ao atualizar perfil." });
+    }
+  }
+
+  async function alterarSenha(req, res) {
+    try {
+      const { id } = req.params;
+      const { senhaAtual, novaSenha } = req.body;
+      const usuarioLogadoId = req.user.usuario_id;
+
+      // Verificar autorização
+      if (parseInt(id, 10) !== usuarioLogadoId) {
+        return res.status(403).json({ error: "Não autorizado." });
+      }
+
+      if (!senhaAtual || !novaSenha) {
+        return res.status(400).json({ 
+          error: "Senha atual e nova senha são obrigatórias." 
+        });
+      }
+
+      // Buscar usuário com senha
+      const usuario = await usuariosRepository.buscarUsuarioPorIdComSenha(id);
+      if (!usuario) {
+        return res.status(404).json({ error: "Usuário não encontrado." });
+      }
+
+      // Validar senha atual
+      const senhaValida = await bcrypt.compare(senhaAtual, usuario.senha);
+      if (!senhaValida) {
+        return res.status(401).json({ error: "Senha atual incorreta." });
+      }
+
+      // Atualizar senha
+      const senhaHash = await bcrypt.hash(novaSenha, 10);
+      await usuariosRepository.atualizarUsuario(id, { senha: senhaHash });
+
+      res.status(200).json({ message: "Senha alterada com sucesso." });
+
+    } catch (error) {
+      console.error("Erro ao alterar senha:", error);
+      res.status(500).json({ error: "Erro interno ao alterar senha." });
+    }
+  }
+
+  async function atualizarFotoPerfil(req, res) {
+    try {
+      const { id } = req.params;
+      const { foto_perfil } = req.body;
+      const usuarioLogadoId = req.user.usuario_id;
+
+      // Verificar autorização
+      if (parseInt(id, 10) !== usuarioLogadoId) {
+        return res.status(403).json({ error: "Não autorizado." });
+      }
+
+      if (!foto_perfil) {
+        return res.status(400).json({ error: "Foto de perfil é obrigatória." });
+      }
+
+      if (!foto_perfil.startsWith('data:image')) {
+        return res.status(400).json({ 
+          error: "Formato inválido para a foto de perfil" 
+        });
+      }
+
+      const updatedUser = await usuariosRepository.atualizarFotoPerfil(id, foto_perfil);
+
+      res.status(200).json({
+        message: "Foto de perfil atualizada com sucesso!",
+        usuario: updatedUser
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar foto de perfil:", error);
+      res.status(500).json({ error: "Erro interno ao atualizar foto de perfil." });
+    }
+  }
+
+  async function deletar(req, res) {
+    try {
+      const { id } = req.params;
+      const deletado = await usuariosRepository.deletarUsuario(id);
+
+      if (!deletado) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+
+      res.json({ message: "Usuário excluído com sucesso" });
+    } catch (error) {
+      console.error("Erro ao excluir usuário:", error);
+      res.status(500).json({ error: "Erro ao excluir usuário" });
     }
   }
 
   return {
-    visualizarUsuario,
     cadastrar,
     logar,
+    listar,
+    buscarPorId,
+    atualizar,
+    deletar,
+    atualizarPerfil,
+    alterarSenha,
+    atualizarFotoPerfil,
   };
 }
 

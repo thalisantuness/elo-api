@@ -1,131 +1,120 @@
-const produtoRepository = require('../repositories/produtoRepository');
+const produtoRepo = require('../repositories/produtoRepository');
+const sharp = require('sharp');
+const s3 = require('../utils/awsConfig');
+const { v4: uuidv4 } = require('uuid');
 
 function ProdutoController() {
+  async function compressImage(buffer) {
+    return sharp(buffer).resize(800).jpeg({ quality: 80 }).toBuffer();
+  }
 
-  async function getProdutos(req, res) {
+  async function uploadToS3(buffer, folder) {
+    const key = `${folder}/${uuidv4()}.jpg`;
+    const result = await s3.upload({ Bucket: process.env.AWS_BUCKET_NAME, Key: key, Body: buffer, ContentType: 'image/jpeg' }).promise();
+    return result.Location;
+  }
+
+  async function listar(req, res) {
     try {
-      const produtos = await produtoRepository.listarProdutos();
-
-      if (produtos.length === 0) {
-        return res.status(404).json({ error: 'Nenhum produto encontrado' });
-      }
-
+      const filtros = req.query || {};
+      const produtos = await produtoRepo.listarProdutos(filtros);
       res.json(produtos);
-    } catch (error) {
-      console.error('Erro ao obter produtos:', error);
-      res.status(500).json({ error: 'Erro ao obter produtos' });
+    } catch (e) {
+      console.error('Erro ao listar produtos:', e);
+      res.status(500).json({ error: 'Erro ao listar produtos' });
     }
   }
 
-  async function getProdutoById(req, res) {
+  async function buscarPorId(req, res) {
     try {
       const { id } = req.params;
-      const produto = await produtoRepository.buscarProdutoPorId(id);
-
-      if (!produto) {
-        return res.status(404).json({ error: 'Produto não encontrado' });
-      }
-
+      const produto = await produtoRepo.buscarProdutoPorId(id);
+      if (!produto) return res.status(404).json({ error: 'Produto não encontrado' });
       res.json(produto);
-    } catch (error) {
-      console.error('Erro ao buscar produto:', error);
+    } catch (e) {
+      console.error('Erro ao buscar produto:', e);
       res.status(500).json({ error: 'Erro ao buscar produto' });
     }
   }
 
-  async function postProduto(req, res) {
+  async function criar(req, res) {
     try {
-      const { nome, preco, preco_venda, quantidade, data_vencimento } = req.body;
+      const { nome, valor, tipo_comercializacao, tipo_produto, estado_id, foto_principal, fotos_secundarias, valor_custo, quantidade } = req.body;
 
-      // Validações
-      if (!nome) {
-        return res.status(400).json({ error: 'O nome do produto é obrigatório' });
-      }
-      if (!preco || preco <= 0) {
-        return res.status(400).json({ error: 'O preço deve ser maior que zero' });
-      }
-      if (!preco_venda || preco_venda <= 0) {
-        return res.status(400).json({ error: 'O preço de venda deve ser maior que zero' });
-      }
-      if (!quantidade || quantidade < 0) {
-        return res.status(400).json({ error: 'A quantidade não pode ser negativa' });
+      if (!nome || !valor || !valor_custo || !quantidade) {
+        return res.status(400).json({ error: 'nome, valor, valor_custo e quantidade são obrigatórios' });
       }
 
-      const novoProduto = await produtoRepository.criarProduto({
-        nome,
-        preco,
-        preco_venda,
-        quantidade,
-        data_vencimento
-      });
-      
-      res.status(201).json(novoProduto);
-    } catch (error) {
-      console.error('Erro ao criar produto:', error);
+      const dados = { nome, valor, tipo_comercializacao, tipo_produto, estado_id, valor_custo, quantidade };
+
+      if (foto_principal && foto_principal.startsWith('data:image')) {
+        const buffer = Buffer.from(foto_principal.split(',')[1], 'base64');
+        const compressed = await compressImage(buffer);
+        dados.foto_principal = await uploadToS3(compressed, 'produtos/principal');
+      }
+
+      const produto = await produtoRepo.criarProduto(dados);
+
+      if (Array.isArray(fotos_secundarias)) {
+        for (const base64 of fotos_secundarias) {
+          if (base64 && base64.startsWith('data:image')) {
+            const buf = Buffer.from(base64.split(',')[1], 'base64');
+            const comp = await compressImage(buf);
+            const url = await uploadToS3(comp, 'produtos/secundarias');
+            await produtoRepo.adicionarFoto(produto.produto_id, url);
+          }
+        }
+      }
+
+      res.status(201).json(produto);
+    } catch (e) {
+      console.error('Erro ao criar produto:', e);
       res.status(500).json({ error: 'Erro ao criar produto' });
     }
   }
 
-  async function putProduto(req, res) {
+  async function atualizar(req, res) {
     try {
       const { id } = req.params;
-      const dadosAtualizados = req.body;
-
-      // Valida se está tentando atualizar a quantidade para valor negativo
-      if (dadosAtualizados.quantidade !== undefined && dadosAtualizados.quantidade < 0) {
-        return res.status(400).json({ error: 'Quantidade não pode ser negativa' });
-      }
-
-      const produtoAtualizado = await produtoRepository.atualizarProduto(id, dadosAtualizados);
-      
-      if (!produtoAtualizado) {
-        return res.status(404).json({ error: 'Produto não encontrado' });
-      }
-
-      res.json(produtoAtualizado);
-    } catch (error) {
-      console.error('Erro ao atualizar produto:', error);
-      res.status(500).json({ error: 'Erro ao atualizar produto' });
+      const dados = req.body;
+      const produto = await produtoRepo.atualizarProduto(id, dados);
+      res.json(produto);
+    } catch (e) {
+      console.error('Erro ao atualizar produto:', e);
+      res.status(500).json({ error: e.message || 'Erro ao atualizar produto' });
     }
   }
 
-  async function deleteProduto(req, res) {
+  async function deletar(req, res) {
     try {
       const { id } = req.params;
-
-      const resultado = await produtoRepository.deletarProduto(id);
+      const resultado = await produtoRepo.deletarProduto(id);
       res.json(resultado);
-    } catch (error) {
-      console.error('Erro ao deletar produto:', error);
+    } catch (e) {
+      console.error('Erro ao deletar produto:', e);
       res.status(500).json({ error: 'Erro ao deletar produto' });
     }
   }
 
-  async function patchEstoque(req, res) {
+  async function adicionarFoto(req, res) {
     try {
       const { id } = req.params;
-      const { quantidade } = req.body;
-
-      if (quantidade === undefined) {
-        return res.status(400).json({ error: 'A quantidade é obrigatória' });
+      const { imageBase64 } = req.body;
+      if (!imageBase64 || !imageBase64.startsWith('data:image')) {
+        return res.status(400).json({ error: 'Imagem inválida' });
       }
-
-      const produto = await produtoRepository.atualizarEstoque(id, quantidade);
-      res.json(produto);
-    } catch (error) {
-      console.error('Erro ao atualizar estoque:', error);
-      res.status(500).json({ error: error.message || 'Erro ao atualizar estoque' });
+      const buf = Buffer.from(imageBase64.split(',')[1], 'base64');
+      const comp = await compressImage(buf);
+      const url = await uploadToS3(comp, 'produtos/secundarias');
+      const foto = await produtoRepo.adicionarFoto(id, url);
+      res.status(201).json(foto);
+    } catch (e) {
+      console.error('Erro ao adicionar foto:', e);
+      res.status(500).json({ error: 'Erro ao adicionar foto' });
     }
   }
 
-  return {
-    getProdutos,
-    getProdutoById,
-    postProduto,
-    putProduto,
-    deleteProduto,
-    patchEstoque
-  };
+  return { listar, buscarPorId, criar, atualizar, deletar, adicionarFoto };
 }
 
 module.exports = ProdutoController;
