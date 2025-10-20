@@ -640,6 +640,408 @@
         }
       ]
     }
+    ,
+    {
+      "name": "Serviços Prestados",
+      "item": [
+        {
+          "name": "Listar Serviços",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/servicos",
+              "host": ["{{base_url}}"],
+              "path": ["servicos"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Serviço",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Banho e Tosa\",\n  \"valor\": 80,\n  \"foto_principal\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/servicos",
+              "host": ["{{base_url}}"],
+              "path": ["servicos"]
+            },
+            "description": "Cria um novo serviço com foto principal em base64"
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Serviço - Sem Foto",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Consulta Veterinária\",\n  \"valor\": 120\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/servicos",
+              "host": ["{{base_url}}"],
+              "path": ["servicos"]
+            },
+            "description": "Exemplo de serviço sem foto (mais simples para teste)"
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Serviço por ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/servicos/1",
+              "host": ["{{base_url}}"],
+              "path": ["servicos", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Serviço",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Banho\",\n  \"valor\": 60,\n  \"foto_principal\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/servicos/1",
+              "host": ["{{base_url}}"],
+              "path": ["servicos", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Deletar Serviço",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/servicos/1",
+              "host": ["{{base_url}}"],
+              "path": ["servicos", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Produtos de Pedido",
+      "item": [
+        {
+          "name": "Listar Produtos de Pedido",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/produtos-pedido",
+              "host": ["{{base_url}}"],
+              "path": ["produtos-pedido"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Produto de Pedido",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Cesta Gourmet\",\n  \"valor\": 150,\n  \"foto_principal\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/produtos-pedido",
+              "host": ["{{base_url}}"],
+              "path": ["produtos-pedido"]
+            },
+            "description": "Cria um novo produto de pedido com foto principal em base64"
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Produto de Pedido - Sem Foto",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Pizza Grande\",\n  \"valor\": 45\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/produtos-pedido",
+              "host": ["{{base_url}}"],
+              "path": ["produtos-pedido"]
+            },
+            "description": "Exemplo de produto de pedido sem foto (mais simples para teste)"
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Produto de Pedido por ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/produtos-pedido/1",
+              "host": ["{{base_url}}"],
+              "path": ["produtos-pedido", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Produto de Pedido",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Cesta Gourmet Premium\",\n  \"valor\": 190,\n  \"foto_principal\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/produtos-pedido/1",
+              "host": ["{{base_url}}"],
+              "path": ["produtos-pedido", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Deletar Produto de Pedido",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/produtos-pedido/1",
+              "host": ["{{base_url}}"],
+              "path": ["produtos-pedido", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Agendamentos",
+      "item": [
+        {
+          "name": "Listar Agendamentos",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/agendamentos",
+              "host": ["{{base_url}}"],
+              "path": ["agendamentos"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Agendamento",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servico_id\": 1,\n  \"usuario_id\": 2,\n  \"dia_marcado\": \"2025-10-20T15:00:00.000Z\",\n  \"observacao\": \"Levar nota fiscal\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/agendamentos",
+              "host": ["{{base_url}}"],
+              "path": ["agendamentos"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Agendamento por ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/agendamentos/1",
+              "host": ["{{base_url}}"],
+              "path": ["agendamentos", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Agendamento",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"confirmado\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/agendamentos/1",
+              "host": ["{{base_url}}"],
+              "path": ["agendamentos", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar Agendamento",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{base_url}}/agendamentos/1/cancelar",
+              "host": ["{{base_url}}"],
+              "path": ["agendamentos", "1", "cancelar"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remarcar Agendamento",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nova_data\": \"2025-10-21T15:00:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/agendamentos/1/remarcar",
+              "host": ["{{base_url}}"],
+              "path": ["agendamentos", "1", "remarcar"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Deletar Agendamento",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/agendamentos/1",
+              "host": ["{{base_url}}"],
+              "path": ["agendamentos", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Pedidos",
+      "item": [
+        {
+          "name": "Listar Pedidos",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/pedidos",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Pedido",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"produto_pedido_id\": 1,\n  \"data_hora_entrega\": \"2025-10-20T18:00:00.000Z\",\n  \"observacao\": \"Tocar campainha\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pedidos",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Pedido por ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/pedidos/1",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Pedido",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"confirmado\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pedidos/1",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos", "1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar Pedido",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{base_url}}/pedidos/1/cancelar",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos", "1", "cancelar"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Deletar Pedido",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/pedidos/1",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
   ],
   "event": [
     {
