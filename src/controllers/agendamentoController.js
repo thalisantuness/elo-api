@@ -3,10 +3,10 @@ const repo = require("../repositories/agendamentoRepository");
 function AgendamentoController() {
   async function listar(req, res) {
     try {
-      const { servico_id, usuario_id, status } = req.query;
+      const { servico_id, cliente_id, status } = req.query;
       const filtros = {};
       if (servico_id) filtros.servico_id = servico_id;
-      if (usuario_id) filtros.usuario_id = usuario_id;
+      if (cliente_id) filtros.cliente_id = cliente_id;
       if (status) filtros.status = status;
       const itens = await repo.listarAgendamentos(filtros);
       res.json(itens);

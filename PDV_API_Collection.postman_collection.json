@@ -665,7 +665,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nome\": \"Banho e Tosa\",\n  \"valor\": 80,\n  \"foto_principal\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
+              "raw": "{\n  \"nome\": \"Banho e Tosa\",\n  \"valor\": 80,\n  \"empresa_id\": 1,\n  \"foto_principal\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/servicos",
@@ -685,7 +685,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nome\": \"Consulta Veterinária\",\n  \"valor\": 120\n}"
+              "raw": "{\n  \"nome\": \"Consulta Veterinária\",\n  \"valor\": 120,\n  \"empresa_id\": 1\n}"
             },
             "url": {
               "raw": "{{base_url}}/servicos",
@@ -865,7 +865,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"servico_id\": 1,\n  \"usuario_id\": 2,\n  \"dia_marcado\": \"2025-10-20T15:00:00.000Z\",\n  \"observacao\": \"Levar nota fiscal\"\n}"
+              "raw": "{\n  \"servico_id\": 1,\n  \"cliente_id\": 2,\n  \"dia_marcado\": \"2025-10-20T15:00:00.000Z\",\n  \"observacao\": \"Levar nota fiscal\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/agendamentos",

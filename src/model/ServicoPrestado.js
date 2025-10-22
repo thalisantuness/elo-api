@@ -1,5 +1,6 @@
 const { Sequelize } = require("sequelize");
 const sequelize = require("../utils/db");
+const { Usuario } = require("./Usuarios");
 
 const ServicoPrestado = sequelize.define(
   "ServicoPrestado",
@@ -8,6 +9,11 @@ const ServicoPrestado = sequelize.define(
       type: Sequelize.INTEGER,
       primaryKey: true,
       autoIncrement: true,
+    },
+    empresa_id: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      references: { model: "usuarios", key: "usuario_id" },
     },
     nome: {
       type: Sequelize.STRING,
@@ -36,6 +42,8 @@ const ServicoPrestado = sequelize.define(
     timestamps: false,
   }
 );
+
+ServicoPrestado.belongsTo(Usuario, { foreignKey: "empresa_id", as: "Empresa" });
 
 module.exports = { ServicoPrestado };
 
