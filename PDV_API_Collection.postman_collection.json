@@ -665,14 +665,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nome\": \"Banho e Tosa\",\n  \"valor\": 80,\n  \"empresa_id\": 1,\n  \"foto_principal\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
+              "raw": "{\n  \"nome\": \"Banho e Tosa\",\n  \"valor\": 80,\n  \"usuario_id\": 1,\n  \"foto_principal\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/servicos",
               "host": ["{{base_url}}"],
               "path": ["servicos"]
             },
-            "description": "Cria um novo serviço com foto principal em base64"
+            "description": "Cria um novo serviço com foto principal em base64. O usuario_id deve ser de um usuário com role='empresa'"
           },
           "response": []
         },
@@ -685,14 +685,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nome\": \"Consulta Veterinária\",\n  \"valor\": 120,\n  \"empresa_id\": 1\n}"
+              "raw": "{\n  \"nome\": \"Consulta Veterinária\",\n  \"valor\": 120,\n  \"usuario_id\": 1\n}"
             },
             "url": {
               "raw": "{{base_url}}/servicos",
               "host": ["{{base_url}}"],
               "path": ["servicos"]
             },
-            "description": "Exemplo de serviço sem foto (mais simples para teste)"
+            "description": "Exemplo de serviço sem foto (mais simples para teste). O usuario_id deve ser de um usuário com role='empresa'"
           },
           "response": []
         },
@@ -854,7 +854,8 @@
               "path": ["agendamentos"]
             }
           },
-          "response": []
+          "response": [],
+          "description": "Lista agendamentos. Filtros: servico_id, usuario_id (cliente), status"
         },
         {
           "name": "Criar Agendamento",
@@ -865,7 +866,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"servico_id\": 1,\n  \"cliente_id\": 2,\n  \"dia_marcado\": \"2025-10-20T15:00:00.000Z\",\n  \"observacao\": \"Levar nota fiscal\"\n}"
+              "raw": "{\n  \"servico_id\": 1,\n  \"usuario_id\": 2,\n  \"dia_marcado\": \"2025-10-20T15:00:00.000Z\",\n  \"observacao\": \"Levar nota fiscal\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/agendamentos",
@@ -873,7 +874,8 @@
               "path": ["agendamentos"]
             }
           },
-          "response": []
+          "response": [],
+          "description": "Cria um agendamento. O usuario_id deve ser de um usuário com role='cliente'. O servico_id pertence a um usuário com role='empresa'"
         },
         {
           "name": "Buscar Agendamento por ID",

@@ -56,8 +56,8 @@ function ServicoPrestadoController() {
 
   async function criar(req, res) {
     try {
-      const { nome, valor, foto_principal, empresa_id } = req.body;
-      const dados = { nome, valor, empresa_id };
+      const { nome, valor, foto_principal, usuario_id } = req.body;
+      const dados = { nome, valor, usuario_id };
 
       if (foto_principal && foto_principal.startsWith('data:image')) {
         try {

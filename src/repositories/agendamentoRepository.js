@@ -6,9 +6,9 @@ async function listarAgendamentos(filtros = {}) {
     include: [
       { 
         association: "Servico",
-        include: [{ association: "Empresa", attributes: ["usuario_id", "nome", "email", "role"] }]
+        include: [{ association: "Usuario", attributes: ["usuario_id", "nome", "email", "role"] }]
       },
-      { association: "Cliente", attributes: ["usuario_id", "nome", "email", "role"] },
+      { association: "Usuario", attributes: ["usuario_id", "nome", "email", "role"] },
     ],
     order: [["dia_marcado", "ASC"]],
   });
@@ -19,9 +19,9 @@ async function buscarAgendamentoPorId(id) {
     include: [
       { 
         association: "Servico",
-        include: [{ association: "Empresa", attributes: ["usuario_id", "nome", "email", "role"] }]
+        include: [{ association: "Usuario", attributes: ["usuario_id", "nome", "email", "role"] }]
       },
-      { association: "Cliente", attributes: ["usuario_id", "nome", "email", "role"] }
+      { association: "Usuario", attributes: ["usuario_id", "nome", "email", "role"] }
     ],
   });
   if (!agendamento) throw new Error("Agendamento não encontrado");
@@ -29,11 +29,11 @@ async function buscarAgendamentoPorId(id) {
 }
 
 async function criarAgendamento(payload) {
-  const { servico_id, cliente_id, dia_marcado, status, observacao } = payload;
-  if (!servico_id || !cliente_id || !dia_marcado) {
-    throw new Error("'servico_id', 'cliente_id' e 'dia_marcado' são obrigatórios");
+  const { servico_id, usuario_id, dia_marcado, status, observacao } = payload;
+  if (!servico_id || !usuario_id || !dia_marcado) {
+    throw new Error("'servico_id', 'usuario_id' e 'dia_marcado' são obrigatórios");
   }
-  return Agendamento.create({ servico_id, cliente_id, dia_marcado, status: status || "agendado", observacao: observacao || null });
+  return Agendamento.create({ servico_id, usuario_id, dia_marcado, status: status || "agendado", observacao: observacao || null });
 }
 
 async function atualizarAgendamento(id, dados) {
