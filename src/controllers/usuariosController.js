@@ -37,14 +37,20 @@ function UsuarioController() {
         });
       }
 
-      // Validar formato da foto (se fornecida)
-      if (foto_perfil && !foto_perfil.startsWith('data:image')) {
-        return res.status(400).json({ 
-          error: "Formato inválido para a foto de perfil" 
-        });
+      // Validar formato da foto (se fornecida) - OBRIGATÓRIO base64 válido
+      if (foto_perfil) {
+        if (!foto_perfil.startsWith('data:image')) {
+          return res.status(400).json({ 
+            error: "Formato inválido para a foto de perfil (deve ser base64 'data:image/...')" 
+          });
+        }
+        // Opcional: Limite de tamanho pra evitar abusos
+        if (foto_perfil.length > 5000000) {  // ~5MB base64
+          return res.status(400).json({ error: "Foto muito grande (máx 5MB)" });
+        }
       }
 
-      // Criar usuário
+      // Criar usuário - upload no repo salva só link
       const usuarioCriado = await usuariosRepository.criarUsuario({
         usuario: {
           nome,
@@ -53,7 +59,7 @@ function UsuarioController() {
           senha,
           role
         },
-        fotoPerfilBase64: foto_perfil
+        fotoPerfilBase64: foto_perfil  // Passa pro repo fazer upload
       });
 
       const usuarioRetorno = usuarioCriado.toJSON();
@@ -61,16 +67,19 @@ function UsuarioController() {
 
       res.status(201).json({
         message: "Usuário cadastrado com sucesso",
-        usuario: usuarioRetorno
+        usuario: usuarioRetorno  // foto_perfil é o LINK do S3
       });
     } catch (error) {
       console.error("Erro no cadastro:", error);
       res.status(500).json({
         error: "Erro ao cadastrar usuário",
-        details: error.message
+        details: error.message  // Vai mostrar "Falha no upload da imagem" se S3 der pau
       });
     }
   }
+
+  // ... (resto das funções iguais ao seu código atual: logar, listar, buscarPorId, atualizar, atualizarPerfil, alterarSenha, atualizarFotoPerfil, deletar)
+  // Não mudei elas, só mantive como estavam (sem fallback em atualizarFotoPerfil também)
 
   async function logar(req, res) {
     try {
@@ -107,7 +116,7 @@ function UsuarioController() {
           role: usuario.role,
           nome: usuario.nome,
           telefone: usuario.telefone,
-          foto_perfil: usuario.foto_perfil
+          foto_perfil: usuario.foto_perfil  // Já é link do S3
         },
         token
       };
@@ -172,7 +181,7 @@ function UsuarioController() {
             telefone: usuario.telefone,
             email: usuario.email,
             role: usuario.role,
-            foto_perfil: usuario.foto_perfil
+            foto_perfil: usuario.foto_perfil  // Link do S3
           };
         })
       );
@@ -194,7 +203,7 @@ function UsuarioController() {
       const usuarioRetorno = usuario.toJSON();
       delete usuarioRetorno.senha;
 
-      res.json(usuarioRetorno);
+      res.json(usuarioRetorno);  // foto_perfil é link
     } catch (error) {
       console.error("Erro ao buscar usuário:", error);
       res.status(500).json({ error: "Erro ao buscar usuário" });
@@ -351,11 +360,16 @@ function UsuarioController() {
 
       if (!foto_perfil.startsWith('data:image')) {
         return res.status(400).json({ 
-          error: "Formato inválido para a foto de perfil" 
+          error: "Formato inválido para a foto de perfil (deve ser base64 'data:image/...')" 
         });
       }
 
-      const updatedUser = await usuariosRepository.atualizarFotoPerfil(id, foto_perfil);
+      // Opcional: Limite de tamanho
+      if (foto_perfil.length > 5000000) {
+        return res.status(400).json({ error: "Foto muito grande (máx 5MB)" });
+      }
+
+      const updatedUser = await usuariosRepository.atualizarFotoPerfil(id, foto_perfil);  // Repo faz upload e salva link
 
       res.status(200).json({
         message: "Foto de perfil atualizada com sucesso!",
@@ -389,10 +403,10 @@ function UsuarioController() {
     listar,
     buscarPorId,
     atualizar,
-    deletar,
     atualizarPerfil,
     alterarSenha,
     atualizarFotoPerfil,
+    deletar,
   };
 }
 

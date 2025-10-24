@@ -23,7 +23,7 @@ async function deleteFromS3(fileUrl) {
   }
 }
 
-// Helper para fazer upload de uma nova imagem para o S3
+// Helper para fazer upload de uma nova imagem para o S3 (OBRIGATÓRIO - sem fallback)
 async function uploadToS3(base64Image, folder) {
   if (!base64Image || !base64Image.startsWith('data:image')) {
     throw new Error('Formato de imagem Base64 inválido');
@@ -44,36 +44,11 @@ async function uploadToS3(base64Image, folder) {
       ContentType: 'image/jpeg',
     }).promise();
 
-    return uploadResult.Location;
+    return uploadResult.Location;  // Retorna só o LINK
   } catch (error) {
     console.error('Erro ao fazer upload para o S3:', error);
-    throw new Error('Falha no upload da imagem');
+    throw new Error('Falha no upload da imagem - verifique configurações do AWS');  // Erro explícito, sem fallback
   }
-}
-
-// Helper para gerar URL assinada (válida por 7 dias)
-function getSignedUrl(key) {
-  return s3.getSignedUrl('getObject', {
-    Bucket: process.env.AWS_BUCKET_NAME,
-    Key: key,
-    Expires: 60 * 60 * 24 * 7 // 7 dias
-  });
-}
-
-// Helper para processar URL da foto (pública ou assinada)
-function processPhotoUrl(photoUrl) {
-  if (!photoUrl || !photoUrl.includes(process.env.AWS_BUCKET_NAME)) {
-    return photoUrl;
-  }
-  
-  // Se é base64, retorna como está
-  if (photoUrl.startsWith('data:image')) {
-    return photoUrl;
-  }
-  
-  // Se é URL do S3, gera URL assinada
-  const key = photoUrl.split('.com/')[1];
-  return getSignedUrl(key);
 }
 
 async function criarUsuario(dados) {
@@ -84,21 +59,15 @@ async function criarUsuario(dados) {
   return sequelize.transaction(async (t) => {
     let foto_perfil = null;
 
-    if (fotoPerfilBase64 && fotoPerfilBase64.startsWith('data:image')) {
-      try {
-        // Tentar fazer upload para S3
-        foto_perfil = await uploadToS3(fotoPerfilBase64, 'usuarios/perfil');
-      } catch (error) {
-        console.error('Erro ao fazer upload para S3, salvando como base64:', error.message);
-        // Se falhar, salvar como base64 no banco
-        foto_perfil = fotoPerfilBase64;
-      }
+    if (fotoPerfilBase64) {
+      // Upload OBRIGATÓRIO - salva só o link
+      foto_perfil = await uploadToS3(fotoPerfilBase64, 'usuarios/perfil');
     }
 
     const usuarioCriado = await Usuario.create({
       ...usuario,
       senha: senhaHash,
-      foto_perfil
+      foto_perfil  // Só link ou null
     }, { transaction: t });
 
     return usuarioCriado;
@@ -107,10 +76,7 @@ async function criarUsuario(dados) {
 
 async function buscarUsuarioPorId(id) {
   const usuario = await Usuario.findByPk(id);
-  if (usuario && usuario.foto_perfil) {
-    usuario.foto_perfil = processPhotoUrl(usuario.foto_perfil);
-  }
-  return usuario;
+  return usuario;  // foto_perfil já é link do S3
 }
 
 async function buscarUsuarioPorEmail(email) {
@@ -135,9 +101,6 @@ async function atualizarPerfil(id, dadosPerfil) {
   });
   if (updatedRows > 0) {
     const usuario = await Usuario.findByPk(id);
-    if (usuario && usuario.foto_perfil) {
-      usuario.foto_perfil = processPhotoUrl(usuario.foto_perfil);
-    }
     return usuario;
   }
   return null;
@@ -163,13 +126,8 @@ async function atualizarFotoPerfil(usuarioId, imageBase64) {
       await deleteFromS3(oldFileUrl);
     }
 
-    let newFileUrl;
-    try {
-      newFileUrl = await uploadToS3(imageBase64, 'usuarios/perfil');
-    } catch (error) {
-      console.error('Erro ao fazer upload para S3, salvando como base64:', error.message);
-      newFileUrl = imageBase64;
-    }
+    // Upload OBRIGATÓRIO - salva só o link
+    const newFileUrl = await uploadToS3(imageBase64, 'usuarios/perfil');
 
     usuario.foto_perfil = newFileUrl;
     await usuario.save({ transaction: t });
@@ -182,15 +140,7 @@ async function atualizarFotoPerfil(usuarioId, imageBase64) {
 
 async function listarUsuarios(filtros = {}) {
   const usuarios = await Usuario.findAll({ where: filtros });
-  
-  // Processar URLs das fotos de perfil
-  usuarios.forEach(usuario => {
-    if (usuario.foto_perfil) {
-      usuario.foto_perfil = processPhotoUrl(usuario.foto_perfil);
-    }
-  });
-  
-  return usuarios;
+  return usuarios;  // foto_perfil já é link
 }
 
 module.exports = {
@@ -204,4 +154,3 @@ module.exports = {
   atualizarFotoPerfil,
   listarUsuarios,
 };
-
