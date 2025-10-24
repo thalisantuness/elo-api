@@ -48,6 +48,7 @@ function ServicoPrestadoController() {
   async function listar(req, res) {
     try {
       const servicos = await repo.listarServicos(req.query || {});
+      // Aqui, no response, o role da Empresa virá no include – use no frontend para mostrar "Usuário Empresa"
       res.json(servicos);
     } catch (error) {
       res.status(500).json({ error: error.message });
@@ -56,8 +57,8 @@ function ServicoPrestadoController() {
 
   async function criar(req, res) {
     try {
-      const { nome, valor, foto_principal, usuario_id } = req.body;
-      const dados = { nome, valor, usuario_id };
+      const { nome, valor, foto_principal, empresa_id } = req.body;  // Renomeado
+      const dados = { nome, valor, empresa_id };  // Renomeado
 
       if (foto_principal && foto_principal.startsWith('data:image')) {
         try {
@@ -71,6 +72,9 @@ function ServicoPrestadoController() {
           });
         }
       }
+
+      // Opcional: Pegue empresa_id do token autenticado, não do body (segurança)
+      // const empresa_id = req.user.empresa_id;  // Exemplo
 
       const servico = await repo.criarServico(dados);
       res.status(201).json(servico);
@@ -90,8 +94,8 @@ function ServicoPrestadoController() {
 
   async function atualizar(req, res) {
     try {
-      const { foto_principal } = req.body;
-      const dados = { ...req.body };
+      const { foto_principal, ...outrosDados } = req.body;  // Separe foto
+      const dados = { ...outrosDados };
 
       if (foto_principal && foto_principal.startsWith('data:image')) {
         try {
@@ -115,7 +119,8 @@ function ServicoPrestadoController() {
 
   async function excluir(req, res) {
     try {
-      await repo.deletarServico(req.params.id);
+      // Passe req para o repo se precisar de auth (ajuste o repo para receber req)
+      await repo.deletarServico(req.params.id, req);  // Exemplo: passe req.user
       res.json({ message: "Serviço excluído com sucesso" });
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -126,5 +131,3 @@ function ServicoPrestadoController() {
 }
 
 module.exports = ServicoPrestadoController;
-
-

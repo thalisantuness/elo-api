@@ -1,7 +1,7 @@
 {
-  "name": "api-corretora",
+  "name": "crm-server-cardial",
   "version": "1.1.0",
-  "description": "Api corretoria",
+  "description": "Servidor da Cardial",
   "main": "app.js",
   "scripts": {
     "start": "nodemon app.js",

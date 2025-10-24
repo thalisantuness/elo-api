@@ -1,4 +1,5 @@
 const { Agendamento } = require("../model/Agendamento");
+const { Usuario } = require("../model/Usuarios");  // Para validação
 
 async function listarAgendamentos(filtros = {}) {
   return Agendamento.findAll({
@@ -6,9 +7,9 @@ async function listarAgendamentos(filtros = {}) {
     include: [
       { 
         association: "Servico",
-        include: [{ association: "Usuario", attributes: ["usuario_id", "nome", "email", "role"] }]
+        include: [{ association: "Empresa", attributes: ["usuario_id", "nome", "email", "role"] }]  // Atualizado para "Empresa"
       },
-      { association: "Usuario", attributes: ["usuario_id", "nome", "email", "role"] },
+      { association: "Cliente", attributes: ["usuario_id", "nome", "email", "role"] },  // Atualizado para "Cliente"
     ],
     order: [["dia_marcado", "ASC"]],
   });
@@ -19,9 +20,9 @@ async function buscarAgendamentoPorId(id) {
     include: [
       { 
         association: "Servico",
-        include: [{ association: "Usuario", attributes: ["usuario_id", "nome", "email", "role"] }]
+        include: [{ association: "Empresa", attributes: ["usuario_id", "nome", "email", "role"] }]  // Atualizado
       },
-      { association: "Usuario", attributes: ["usuario_id", "nome", "email", "role"] }
+      { association: "Cliente", attributes: ["usuario_id", "nome", "email", "role"] }  // Atualizado
     ],
   });
   if (!agendamento) throw new Error("Agendamento não encontrado");
@@ -29,15 +30,36 @@ async function buscarAgendamentoPorId(id) {
 }
 
 async function criarAgendamento(payload) {
-  const { servico_id, usuario_id, dia_marcado, status, observacao } = payload;
-  if (!servico_id || !usuario_id || !dia_marcado) {
-    throw new Error("'servico_id', 'usuario_id' e 'dia_marcado' são obrigatórios");
+  const { servico_id, cliente_id, dia_marcado, status, observacao } = payload;  // Renomeado
+  if (!servico_id || !cliente_id || !dia_marcado) {  // Renomeado
+    throw new Error("'servico_id', 'cliente_id' e 'dia_marcado' são obrigatórios");  // Renomeado
   }
-  return Agendamento.create({ servico_id, usuario_id, dia_marcado, status: status || "agendado", observacao: observacao || null });
+
+  // Validação: Checar se cliente existe (opcional: adicione checagem de role 'cliente' se aplicável)
+  const cliente = await Usuario.findByPk(cliente_id);
+  if (!cliente) {
+    throw new Error("Cliente não encontrado");
+  }
+  // Exemplo: if (cliente.role !== 'cliente') { throw new Error("Usuário deve ser cliente"); }
+
+  return Agendamento.create({ 
+    servico_id, 
+    cliente_id,  // Renomeado
+    dia_marcado, 
+    status: status || "agendado", 
+    observacao: observacao || null 
+  });
 }
 
 async function atualizarAgendamento(id, dados) {
   const agendamento = await buscarAgendamentoPorId(id);
+
+  // Validação adicional: Se alterando cliente, checar permissão (ex: admin ou dono)
+  if (dados.cliente_id && dados.cliente_id !== agendamento.cliente_id) {
+    const clienteAtual = await Usuario.findByPk(agendamento.cliente_id);
+    // Exemplo: if (clienteAtual.role !== 'admin') { throw new Error("Não autorizado"); }
+  }
+
   return agendamento.update(dados);
 }
 
@@ -65,5 +87,3 @@ module.exports = {
   remarcarAgendamento,
   deletarAgendamento,
 };
-
-

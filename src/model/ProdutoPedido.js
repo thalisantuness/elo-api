@@ -1,5 +1,6 @@
 const { Sequelize } = require("sequelize");
 const sequelize = require("../utils/db");
+const { Usuario } = require("./Usuarios");  // Import para associação
 
 const ProdutoPedido = sequelize.define(
   "ProdutoPedido",
@@ -8,6 +9,11 @@ const ProdutoPedido = sequelize.define(
       type: Sequelize.INTEGER,
       primaryKey: true,
       autoIncrement: true,
+    },
+    empresa_id: {  // Novo campo: Produto cadastrado por empresa/admin
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      references: { model: "usuarios", key: "usuario_id" },
     },
     nome: {
       type: Sequelize.STRING,
@@ -37,6 +43,7 @@ const ProdutoPedido = sequelize.define(
   }
 );
 
+// Associação: ProdutoPedido pertence a Empresa
+ProdutoPedido.belongsTo(Usuario, { foreignKey: "empresa_id", as: "Empresa" });
+
 module.exports = { ProdutoPedido };
-
-

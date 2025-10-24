@@ -3,10 +3,10 @@ const repo = require("../repositories/agendamentoRepository");
 function AgendamentoController() {
   async function listar(req, res) {
     try {
-      const { servico_id, usuario_id, status } = req.query;
+      const { servico_id, cliente_id, status } = req.query;  // Renomeado
       const filtros = {};
       if (servico_id) filtros.servico_id = servico_id;
-      if (usuario_id) filtros.usuario_id = usuario_id;
+      if (cliente_id) filtros.cliente_id = cliente_id;  // Renomeado
       if (status) filtros.status = status;
       const itens = await repo.listarAgendamentos(filtros);
       res.json(itens);
@@ -17,7 +17,9 @@ function AgendamentoController() {
 
   async function criar(req, res) {
     try {
-      const item = await repo.criarAgendamento(req.body);
+      const { servico_id, cliente_id, dia_marcado, status, observacao } = req.body;  // Renomeado
+      const payload = { servico_id, cliente_id, dia_marcado, status, observacao };  // Renomeado
+      const item = await repo.criarAgendamento(payload);
       res.status(201).json(item);
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -35,7 +37,11 @@ function AgendamentoController() {
 
   async function atualizar(req, res) {
     try {
-      const item = await repo.atualizarAgendamento(req.params.id, req.body);
+      const dados = req.body;
+      if (dados.cliente_id) {  // Opcional: validação aqui se precisar
+        // Ex: checar auth do req.user
+      }
+      const item = await repo.atualizarAgendamento(req.params.id, dados);
       res.json(item);
     } catch (error) {
       res.status(400).json({ error: error.message });
@@ -73,5 +79,3 @@ function AgendamentoController() {
 }
 
 module.exports = AgendamentoController;
-
-

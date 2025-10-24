@@ -16,7 +16,7 @@ const Agendamento = sequelize.define(
       allowNull: false,
       references: { model: "servicos_prestados", key: "servico_id" },
     },
-    usuario_id: {
+    cliente_id: {  // Renomeado de usuario_id
       type: Sequelize.INTEGER,
       allowNull: false,
       references: { model: "usuarios", key: "usuario_id" },
@@ -50,9 +50,8 @@ const Agendamento = sequelize.define(
   }
 );
 
+// Associações atualizadas: foreignKey para cliente_id, alias "Cliente"
 Agendamento.belongsTo(ServicoPrestado, { foreignKey: "servico_id", as: "Servico" });
-Agendamento.belongsTo(Usuario, { foreignKey: "usuario_id", as: "Usuario" });
+Agendamento.belongsTo(Usuario, { foreignKey: "cliente_id", as: "Cliente" });  // Renomeado
 
-module.exports = { Agendamento };
-
-
+module.exports = { Agendamento }; 

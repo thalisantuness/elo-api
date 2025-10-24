@@ -10,7 +10,7 @@ const ServicoPrestado = sequelize.define(
       primaryKey: true,
       autoIncrement: true,
     },
-    usuario_id: {
+    empresa_id: {  // Renomeado de usuario_id
       type: Sequelize.INTEGER,
       allowNull: false,
       references: { model: "usuarios", key: "usuario_id" },
@@ -43,8 +43,7 @@ const ServicoPrestado = sequelize.define(
   }
 );
 
-ServicoPrestado.belongsTo(Usuario, { foreignKey: "usuario_id", as: "Usuario" });
+// Associação atualizada: foreignKey agora é empresa_id, alias "Empresa" para clareza
+ServicoPrestado.belongsTo(Usuario, { foreignKey: "empresa_id", as: "Empresa" });
 
 module.exports = { ServicoPrestado };
-
-

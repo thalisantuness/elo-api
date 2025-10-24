@@ -1,6 +1,7 @@
 const { Sequelize } = require("sequelize");
 const sequelize = require("../utils/db");
 const { ProdutoPedido } = require("./ProdutoPedido");
+const { Usuario } = require("./Usuarios");  // Para associação com Cliente
 
 const Pedido = sequelize.define(
   "Pedido",
@@ -14,6 +15,11 @@ const Pedido = sequelize.define(
       type: Sequelize.INTEGER,
       allowNull: false,
       references: { model: "produtos_pedidos", key: "produto_pedido_id" },
+    },
+    cliente_id: {  // Novo campo: Pedido feito por cliente
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      references: { model: "usuarios", key: "usuario_id" },
     },
     data_hora_entrega: {
       type: Sequelize.DATE,
@@ -44,8 +50,8 @@ const Pedido = sequelize.define(
   }
 );
 
+// Associações
 Pedido.belongsTo(ProdutoPedido, { foreignKey: "produto_pedido_id", as: "ProdutoPedido" });
+Pedido.belongsTo(Usuario, { foreignKey: "cliente_id", as: "Cliente" });  // Nova: Pedido pertence a Cliente
 
 module.exports = { Pedido };
-
-

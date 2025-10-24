@@ -56,8 +56,8 @@ function ProdutoPedidoController() {
 
   async function criar(req, res) {
     try {
-      const { nome, valor, foto_principal } = req.body;
-      const dados = { nome, valor };
+      const { nome, valor, foto_principal, empresa_id } = req.body;  // Adicionado empresa_id
+      const dados = { nome, valor, empresa_id };  // Adicionado
 
       if (foto_principal && foto_principal.startsWith('data:image')) {
         try {
@@ -71,6 +71,9 @@ function ProdutoPedidoController() {
           });
         }
       }
+
+      // Opcional: Pegue empresa_id do token autenticado para segurança
+      // const empresa_id = req.user.empresa_id;
 
       const item = await repo.criarProdutoPedido(dados);
       res.status(201).json(item);
@@ -90,8 +93,8 @@ function ProdutoPedidoController() {
 
   async function atualizar(req, res) {
     try {
-      const { foto_principal } = req.body;
-      const dados = { ...req.body };
+      const { foto_principal, ...outrosDados } = req.body;
+      const dados = { ...outrosDados };
 
       if (foto_principal && foto_principal.startsWith('data:image')) {
         try {
@@ -126,5 +129,3 @@ function ProdutoPedidoController() {
 }
 
 module.exports = ProdutoPedidoController;
-
-
