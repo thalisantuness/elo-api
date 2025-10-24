@@ -31,7 +31,7 @@ const Usuario = sequelize.define(
       allowNull: false,
     },
     foto_perfil: {
-      type: Sequelize.STRING(500),  // Aumentado pra 500 pra links S3 longos (sem base64)
+      type: Sequelize.TEXT,  // Igual produtos: TEXT ilimitado pra links S3
       allowNull: true,
     },
     data_cadastro: {

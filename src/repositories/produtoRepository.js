@@ -8,7 +8,7 @@ async function listarProdutos(filtros = {}) {
     order: [['data_cadastro', 'DESC']]
   });
 
-  // Formatar os dados conforme o padrão da imagem
+  // Formatar os dados: padronizar para imageData (principal) e photos (secundárias)
   return produtos.map(produto => {
     const produtoData = produto.toJSON();
     
@@ -19,9 +19,17 @@ async function listarProdutos(filtros = {}) {
     })) : [];
 
     return {
-      ...produtoData,
-      imageData: produtoData.foto_principal, // foto principal como imageData
-      photos: photos
+      produto_id: produtoData.produto_id,
+      nome: produtoData.nome,
+      valor: produtoData.valor,
+      valor_custo: produtoData.valor_custo,
+      quantidade: produtoData.quantidade,
+      tipo_comercializacao: produtoData.tipo_comercializacao,
+      tipo_produto: produtoData.tipo_produto,
+      imageData: produtoData.foto_principal,  // Principal como imageData
+      photos: photos,  // Secundárias como photos
+      data_cadastro: produtoData.data_cadastro,
+      data_update: produtoData.data_update
     };
   });
 }
@@ -42,9 +50,17 @@ async function buscarProdutoPorId(id) {
   })) : [];
 
   return {
-    ...produtoData,
-    imageData: produtoData.foto_principal, // foto principal como imageData
-    photos: photos
+    produto_id: produtoData.produto_id,
+    nome: produtoData.nome,
+    valor: produtoData.valor,
+    valor_custo: produtoData.valor_custo,
+    quantidade: produtoData.quantidade,
+    tipo_comercializacao: produtoData.tipo_comercializacao,
+    tipo_produto: produtoData.tipo_produto,
+    imageData: produtoData.foto_principal,  // Principal como imageData
+    photos: photos,  // Secundárias como photos
+    data_cadastro: produtoData.data_cadastro,
+    data_update: produtoData.data_update
   };
 }
 
@@ -81,5 +97,3 @@ module.exports = {
   deletarProduto,
   adicionarFoto,
 };
-
-

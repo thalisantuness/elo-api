@@ -2,7 +2,7 @@ const usuariosRepository = require("../repositories/usuariosRepository");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const authConfig = require("../config/auth.json");
-const { Sequelize, Op } = require("sequelize");  // Adicionei Op aqui para usar em listar
+const { Sequelize, Op } = require("sequelize");
 
 function UsuarioController() {
   async function cadastrar(req, res) {
@@ -37,20 +37,20 @@ function UsuarioController() {
         });
       }
 
-      // Validar formato da foto (se fornecida) - OBRIGATÓRIO base64 válido
+      // Validar formato da foto (igual produtos) - se fornecida
       if (foto_perfil) {
         if (!foto_perfil.startsWith('data:image')) {
           return res.status(400).json({ 
             error: "Formato inválido para a foto de perfil (deve ser base64 'data:image/...')" 
           });
         }
-        // Opcional: Limite de tamanho pra evitar abusos
+        // Limite de tamanho (igual produtos)
         if (foto_perfil.length > 5000000) {  // ~5MB base64
           return res.status(400).json({ error: "Foto muito grande (máx 5MB)" });
         }
       }
 
-      // Criar usuário - upload no repo salva só link
+      // Criar usuário - repo valida/comprime/upload e salva link
       const usuarioCriado = await usuariosRepository.criarUsuario({
         usuario: {
           nome,
@@ -59,7 +59,7 @@ function UsuarioController() {
           senha,
           role
         },
-        fotoPerfilBase64: foto_perfil  // Passa pro repo fazer upload
+        fotoPerfilBase64: foto_perfil
       });
 
       const usuarioRetorno = usuarioCriado.toJSON();
@@ -67,19 +67,16 @@ function UsuarioController() {
 
       res.status(201).json({
         message: "Usuário cadastrado com sucesso",
-        usuario: usuarioRetorno  // foto_perfil é o LINK do S3
+        usuario: usuarioRetorno  // foto_perfil: link S3
       });
     } catch (error) {
       console.error("Erro no cadastro:", error);
       res.status(500).json({
         error: "Erro ao cadastrar usuário",
-        details: error.message  // Vai mostrar "Falha no upload da imagem" se S3 der pau
+        details: error.message  // Ex: "Erro ao processar imagem" se base64 inválido
       });
     }
   }
-
-  // ... (resto das funções iguais ao seu código atual: logar, listar, buscarPorId, atualizar, atualizarPerfil, alterarSenha, atualizarFotoPerfil, deletar)
-  // Não mudei elas, só mantive como estavam (sem fallback em atualizarFotoPerfil também)
 
   async function logar(req, res) {
     try {
@@ -364,16 +361,16 @@ function UsuarioController() {
         });
       }
 
-      // Opcional: Limite de tamanho
+      // Limite de tamanho (igual produtos)
       if (foto_perfil.length > 5000000) {
         return res.status(400).json({ error: "Foto muito grande (máx 5MB)" });
       }
 
-      const updatedUser = await usuariosRepository.atualizarFotoPerfil(id, foto_perfil);  // Repo faz upload e salva link
+      const updatedUser = await usuariosRepository.atualizarFotoPerfil(id, foto_perfil);  // Repo processa e salva link
 
       res.status(200).json({
         message: "Foto de perfil atualizada com sucesso!",
-        usuario: updatedUser
+        usuario: updatedUser  // foto_perfil: novo link S3
       });
     } catch (error) {
       console.error("Erro ao atualizar foto de perfil:", error);
