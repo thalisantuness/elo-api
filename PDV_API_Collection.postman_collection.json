@@ -1,9 +1,9 @@
 {
   "info": {
-    "name": "PDV API Collection",
-    "description": "Collection para API do sistema PDV - Backend",
+    "name": "PDV API Collection v2.0",
+    "description": "Collection atualizada para API do sistema PDV - Backend\n\nVERSÃO 2.0 - BREAKING CHANGES:\n- Removido: Agendamentos, Serviços Prestados, Produtos de Pedido\n- Pedidos agora referenciam Produtos diretamente\n- Produtos têm novos campos: menu e empresas_autorizadas",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "version": "1.0.0"
+    "version": "2.0.0"
   },
   "auth": {
     "type": "bearer",
@@ -43,7 +43,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nome\": \"João Silva\",\n  \"telefone\": \"11999999999\",\n  \"email\": \"joao@email.com\",\n  \"senha\": \"123456\",\n  \"role\": \"cliente\",\n  \"foto_perfil\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
+              "raw": "{\n  \"nome\": \"João Silva\",\n  \"telefone\": \"11999999999\",\n  \"email\": \"joao@email.com\",\n  \"senha\": \"123456\",\n  \"role\": \"cliente\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/cadastrar",
@@ -139,7 +139,7 @@
               "host": ["{{base_url}}"],
               "path": ["usuarios"]
             },
-            "description": "Lista usuários baseado no role do usuário logado:\n- Admin: Vê todos os usuários (incluindo outros admins)\n- Empresa: Vê empresas e clientes (não vê admins)\n- Cliente: Vê apenas empresas (não vê admins nem outras empresas)"
+            "description": "Lista usuários baseado no role do usuário logado"
           },
           "response": []
         },
@@ -147,12 +147,6 @@
           "name": "Buscar Usuário por ID",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{auth_token}}"
-              }
-            ],
             "url": {
               "raw": "{{base_url}}/usuarios/1",
               "host": ["{{base_url}}"],
@@ -184,93 +178,9 @@
           "response": []
         },
         {
-          "name": "Atualizar Perfil",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{auth_token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nome\": \"João Silva Perfil\",\n  \"telefone\": \"11777777777\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/usuarios/1/perfil",
-              "host": ["{{base_url}}"],
-              "path": ["usuarios", "1", "perfil"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Alterar Senha",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{auth_token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"senhaAtual\": \"123456\",\n  \"novaSenha\": \"654321\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/usuarios/1/senha",
-              "host": ["{{base_url}}"],
-              "path": ["usuarios", "1", "senha"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Atualizar Foto de Perfil",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{auth_token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"foto_perfil\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/usuarios/1/foto",
-              "host": ["{{base_url}}"],
-              "path": ["usuarios", "1", "foto"]
-            }
-          },
-          "response": []
-        },
-        {
           "name": "Deletar Usuário",
           "request": {
             "method": "DELETE",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{auth_token}}"
-              }
-            ],
             "url": {
               "raw": "{{base_url}}/usuarios/1",
               "host": ["{{base_url}}"],
@@ -294,14 +204,10 @@
               "path": ["produtos"],
               "query": [
                 {
-                  "key": "tipo_produto",
-                  "value": "eletronico",
-                  "disabled": true
-                },
-                {
-                  "key": "tipo_comercializacao",
-                  "value": "venda",
-                  "disabled": true
+                  "key": "menu",
+                  "value": "ecommerce",
+                  "disabled": true,
+                  "description": "Filtrar por menu: ecommerce, varejo ou ambos"
                 }
               ]
             }
@@ -321,48 +227,82 @@
           "response": []
         },
         {
-          "name": "Criar Produto",
+          "name": "Criar Produto - Empresa",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nome\": \"Smartphone Samsung\",\n  \"valor\": 1200.00,\n  \"valor_custo\": 800.00,\n  \"quantidade\": 10,\n  \"tipo_comercializacao\": \"venda\",\n  \"tipo_produto\": \"eletronico\",\n  \"estado_id\": 1,\n  \"foto_principal\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\",\n  \"fotos_secundarias\": [\n    \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\",\n    \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n  ]\n}"
+              "raw": "{\n  \"nome\": \"Smartphone Samsung\",\n  \"valor\": 1200.00,\n  \"valor_custo\": 800.00,\n  \"quantidade\": 10,\n  \"tipo_comercializacao\": \"venda\",\n  \"tipo_produto\": \"eletronico\",\n  \"menu\": \"ecommerce\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/produtos",
               "host": ["{{base_url}}"],
               "path": ["produtos"]
             },
-            "description": "Cria um novo produto. Se S3 falhar, fotos são salvas como base64 no banco."
+            "description": "Empresa cadastra produto para si mesma automaticamente.\nCampo menu aceita: 'ecommerce', 'varejo' ou 'ambos'"
           },
           "response": []
         },
         {
-          "name": "Criar Produto - Sem Fotos",
+          "name": "Criar Produto - Admin",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nome\": \"Produto Simples\",\n  \"valor\": 50.00,\n  \"valor_custo\": 30.00,\n  \"quantidade\": 5,\n  \"tipo_comercializacao\": \"venda\",\n  \"tipo_produto\": \"geral\"\n}"
+              "raw": "{\n  \"nome\": \"Notebook Dell\",\n  \"valor\": 3500.00,\n  \"valor_custo\": 2500.00,\n  \"quantidade\": 5,\n  \"tipo_comercializacao\": \"venda\",\n  \"tipo_produto\": \"eletronico\",\n  \"menu\": \"ambos\",\n  \"empresas_autorizadas\": [2, 16]\n}"
             },
             "url": {
               "raw": "{{base_url}}/produtos",
               "host": ["{{base_url}}"],
               "path": ["produtos"]
             },
-            "description": "Exemplo de produto sem fotos (mais simples para teste)"
+            "description": "Admin pode especificar empresas_autorizadas (array de IDs de empresas).\nSe não informar, cadastra para si mesmo.\nCampo menu aceita: 'ecommerce', 'varejo' ou 'ambos'"
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Produto - Com Fotos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Produto com Fotos\",\n  \"valor\": 250.00,\n  \"valor_custo\": 150.00,\n  \"quantidade\": 20,\n  \"tipo_comercializacao\": \"venda\",\n  \"tipo_produto\": \"geral\",\n  \"menu\": \"varejo\",\n  \"foto_principal\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\",\n  \"fotos_secundarias\": [\n    \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/produtos",
+              "host": ["{{base_url}}"],
+              "path": ["produtos"]
+            }
           },
           "response": []
         },
@@ -374,11 +314,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nome\": \"Smartphone Samsung Galaxy\",\n  \"valor\": 1300.00,\n  \"quantidade\": 15\n}"
+              "raw": "{\n  \"nome\": \"Smartphone Samsung Galaxy\",\n  \"valor\": 1300.00,\n  \"quantidade\": 15,\n  \"menu\": \"ambos\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/produtos/1",
@@ -425,6 +369,192 @@
       ]
     },
     {
+      "name": "Pedidos",
+      "item": [
+        {
+          "name": "Listar Pedidos",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/pedidos",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos"],
+              "query": [
+                {
+                  "key": "produto_id",
+                  "value": "1",
+                  "disabled": true,
+                  "description": "Filtrar por produto"
+                },
+                {
+                  "key": "cliente_id",
+                  "value": "10",
+                  "disabled": true,
+                  "description": "Filtrar por cliente"
+                },
+                {
+                  "key": "empresa_id",
+                  "value": "2",
+                  "disabled": true,
+                  "description": "Filtrar por empresa"
+                },
+                {
+                  "key": "status",
+                  "value": "pendente",
+                  "disabled": true,
+                  "description": "Filtrar por status"
+                }
+              ]
+            },
+            "description": "Lista pedidos com filtros opcionais.\nRetorna: Produto, Cliente e Empresa relacionados."
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Pedido por ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/pedidos/1",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos", "1"]
+            },
+            "description": "Retorna pedido completo com Produto, Cliente e Empresa"
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Pedido - Cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"produto_id\": 5,\n  \"empresa_id\": 2,\n  \"quantidade\": 3,\n  \"data_hora_entrega\": \"2025-10-30T14:00:00\",\n  \"observacao\": \"Entregar no período da manhã\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pedidos",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos"]
+            },
+            "description": "Cliente cria pedido.\ncliente_id é preenchido automaticamente pelo token.\nCampos obrigatórios: produto_id, empresa_id, data_hora_entrega"
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Pedido - Empresa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"produto_id\": 5,\n  \"cliente_id\": 10,\n  \"quantidade\": 2,\n  \"data_hora_entrega\": \"2025-10-30T14:00:00\",\n  \"observacao\": \"Cliente solicitou embalagem especial\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pedidos",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos"]
+            },
+            "description": "Empresa cria pedido.\nempresa_id é preenchido automaticamente pelo token.\nCampos obrigatórios: produto_id, cliente_id, data_hora_entrega"
+          },
+          "response": []
+        },
+        {
+          "name": "Criar Pedido - Admin (Completo)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"produto_id\": 5,\n  \"cliente_id\": 10,\n  \"empresa_id\": 2,\n  \"quantidade\": 5,\n  \"data_hora_entrega\": \"2025-10-30T14:00:00\",\n  \"status\": \"confirmado\",\n  \"observacao\": \"Pedido especial\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pedidos",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos"]
+            },
+            "description": "Admin pode especificar todos os campos.\nCampos obrigatórios: produto_id, cliente_id, empresa_id, data_hora_entrega"
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Pedido",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"confirmado\",\n  \"observacao\": \"Pedido confirmado pela empresa\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/pedidos/1",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos", "1"]
+            },
+            "description": "Atualiza campos do pedido.\nStatus: pendente, confirmado, em_transporte, entregue, cancelado"
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar Pedido",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{base_url}}/pedidos/1/cancelar",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos", "1", "cancelar"]
+            },
+            "description": "Altera status do pedido para 'cancelado'"
+          },
+          "response": []
+        },
+        {
+          "name": "Deletar Pedido",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/pedidos/1",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos", "1"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "Chat",
       "item": [
         {
@@ -461,68 +591,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"frete_id\": 1,\n  \"destinatario_id\": 2\n}"
+              "raw": "{\n  \"destinatario_id\": 2\n}"
             },
             "url": {
               "raw": "{{base_url}}/conversas",
               "host": ["{{base_url}}"],
               "path": ["conversas"]
             },
-            "description": "Cria uma conversa entre usuários. Permissões:\n- Admin: Pode conversar com qualquer um\n- Empresa: Pode conversar com clientes\n- Cliente: Pode conversar com empresas"
-          },
-          "response": []
-        },
-        {
-          "name": "Criar Conversa - Admin com Cliente",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{auth_token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"frete_id\": 1,\n  \"destinatario_id\": 5\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/conversas",
-              "host": ["{{base_url}}"],
-              "path": ["conversas"]
-            },
-            "description": "Exemplo: Admin conversando com Cliente (ID: 5)"
-          },
-          "response": []
-        },
-        {
-          "name": "Criar Conversa - Admin com Empresa",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{auth_token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"frete_id\": 1,\n  \"destinatario_id\": 7\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/conversas",
-              "host": ["{{base_url}}"],
-              "path": ["conversas"]
-            },
-            "description": "Exemplo: Admin conversando com Empresa (ID: 7)"
+            "description": "Cria conversa. Permissões:\n- Admin: com qualquer um\n- Empresa: com clientes\n- Cliente: com empresas"
           },
           "response": []
         },
@@ -563,486 +639,6 @@
           "response": []
         }
       ]
-    },
-    {
-      "name": "Vendas",
-      "description": "Rotas de vendas (não implementadas no routes.js mas disponíveis no controller)",
-      "item": [
-        {
-          "name": "Listar Vendas",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/vendas",
-              "host": ["{{base_url}}"],
-              "path": ["vendas"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Buscar Venda por ID",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/vendas/1",
-              "host": ["{{base_url}}"],
-              "path": ["vendas", "1"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Criar Venda",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"usuario_id\": 1,\n  \"status\": \"finalizada\",\n  \"itens\": [\n    {\n      \"produto_id\": 1,\n      \"quantidade\": 2,\n      \"preco_unitario\": 1200.00\n    },\n    {\n      \"produto_id\": 2,\n      \"quantidade\": 1,\n      \"preco_unitario\": 500.00\n    }\n  ]\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/vendas",
-              "host": ["{{base_url}}"],
-              "path": ["vendas"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Cancelar Venda",
-          "request": {
-            "method": "PATCH",
-            "url": {
-              "raw": "{{base_url}}/vendas/1/cancelar",
-              "host": ["{{base_url}}"],
-              "path": ["vendas", "1", "cancelar"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Deletar Venda",
-          "request": {
-            "method": "DELETE",
-            "url": {
-              "raw": "{{base_url}}/vendas/1",
-              "host": ["{{base_url}}"],
-              "path": ["vendas", "1"]
-            }
-          },
-          "response": []
-        }
-      ]
-    }
-    ,
-    {
-      "name": "Serviços Prestados",
-      "item": [
-        {
-          "name": "Listar Serviços",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/servicos",
-              "host": ["{{base_url}}"],
-              "path": ["servicos"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Criar Serviço",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nome\": \"Banho e Tosa\",\n  \"valor\": 80,\n  \"usuario_id\": 1,\n  \"foto_principal\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/servicos",
-              "host": ["{{base_url}}"],
-              "path": ["servicos"]
-            },
-            "description": "Cria um novo serviço com foto principal em base64. O usuario_id deve ser de um usuário com role='empresa'"
-          },
-          "response": []
-        },
-        {
-          "name": "Criar Serviço - Sem Foto",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nome\": \"Consulta Veterinária\",\n  \"valor\": 120,\n  \"usuario_id\": 1\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/servicos",
-              "host": ["{{base_url}}"],
-              "path": ["servicos"]
-            },
-            "description": "Exemplo de serviço sem foto (mais simples para teste). O usuario_id deve ser de um usuário com role='empresa'"
-          },
-          "response": []
-        },
-        {
-          "name": "Buscar Serviço por ID",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/servicos/1",
-              "host": ["{{base_url}}"],
-              "path": ["servicos", "1"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Atualizar Serviço",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nome\": \"Banho\",\n  \"valor\": 60,\n  \"foto_principal\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/servicos/1",
-              "host": ["{{base_url}}"],
-              "path": ["servicos", "1"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Deletar Serviço",
-          "request": {
-            "method": "DELETE",
-            "url": {
-              "raw": "{{base_url}}/servicos/1",
-              "host": ["{{base_url}}"],
-              "path": ["servicos", "1"]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "Produtos de Pedido",
-      "item": [
-        {
-          "name": "Listar Produtos de Pedido",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/produtos-pedido",
-              "host": ["{{base_url}}"],
-              "path": ["produtos-pedido"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Criar Produto de Pedido",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nome\": \"Cesta Gourmet\",\n  \"valor\": 150,\n  \"foto_principal\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/produtos-pedido",
-              "host": ["{{base_url}}"],
-              "path": ["produtos-pedido"]
-            },
-            "description": "Cria um novo produto de pedido com foto principal em base64"
-          },
-          "response": []
-        },
-        {
-          "name": "Criar Produto de Pedido - Sem Foto",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nome\": \"Pizza Grande\",\n  \"valor\": 45\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/produtos-pedido",
-              "host": ["{{base_url}}"],
-              "path": ["produtos-pedido"]
-            },
-            "description": "Exemplo de produto de pedido sem foto (mais simples para teste)"
-          },
-          "response": []
-        },
-        {
-          "name": "Buscar Produto de Pedido por ID",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/produtos-pedido/1",
-              "host": ["{{base_url}}"],
-              "path": ["produtos-pedido", "1"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Atualizar Produto de Pedido",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nome\": \"Cesta Gourmet Premium\",\n  \"valor\": 190,\n  \"foto_principal\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD...\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/produtos-pedido/1",
-              "host": ["{{base_url}}"],
-              "path": ["produtos-pedido", "1"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Deletar Produto de Pedido",
-          "request": {
-            "method": "DELETE",
-            "url": {
-              "raw": "{{base_url}}/produtos-pedido/1",
-              "host": ["{{base_url}}"],
-              "path": ["produtos-pedido", "1"]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "Agendamentos",
-      "item": [
-        {
-          "name": "Listar Agendamentos",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/agendamentos",
-              "host": ["{{base_url}}"],
-              "path": ["agendamentos"]
-            }
-          },
-          "response": [],
-          "description": "Lista agendamentos. Filtros: servico_id, usuario_id (cliente), status"
-        },
-        {
-          "name": "Criar Agendamento",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"servico_id\": 1,\n  \"usuario_id\": 2,\n  \"dia_marcado\": \"2025-10-20T15:00:00.000Z\",\n  \"observacao\": \"Levar nota fiscal\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/agendamentos",
-              "host": ["{{base_url}}"],
-              "path": ["agendamentos"]
-            }
-          },
-          "response": [],
-          "description": "Cria um agendamento. O usuario_id deve ser de um usuário com role='cliente'. O servico_id pertence a um usuário com role='empresa'"
-        },
-        {
-          "name": "Buscar Agendamento por ID",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/agendamentos/1",
-              "host": ["{{base_url}}"],
-              "path": ["agendamentos", "1"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Atualizar Agendamento",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"confirmado\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/agendamentos/1",
-              "host": ["{{base_url}}"],
-              "path": ["agendamentos", "1"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Cancelar Agendamento",
-          "request": {
-            "method": "PUT",
-            "url": {
-              "raw": "{{base_url}}/agendamentos/1/cancelar",
-              "host": ["{{base_url}}"],
-              "path": ["agendamentos", "1", "cancelar"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Remarcar Agendamento",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"nova_data\": \"2025-10-21T15:00:00.000Z\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/agendamentos/1/remarcar",
-              "host": ["{{base_url}}"],
-              "path": ["agendamentos", "1", "remarcar"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Deletar Agendamento",
-          "request": {
-            "method": "DELETE",
-            "url": {
-              "raw": "{{base_url}}/agendamentos/1",
-              "host": ["{{base_url}}"],
-              "path": ["agendamentos", "1"]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "Pedidos",
-      "item": [
-        {
-          "name": "Listar Pedidos",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/pedidos",
-              "host": ["{{base_url}}"],
-              "path": ["pedidos"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Criar Pedido",
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"produto_pedido_id\": 1,\n  \"data_hora_entrega\": \"2025-10-20T18:00:00.000Z\",\n  \"observacao\": \"Tocar campainha\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/pedidos",
-              "host": ["{{base_url}}"],
-              "path": ["pedidos"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Buscar Pedido por ID",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/pedidos/1",
-              "host": ["{{base_url}}"],
-              "path": ["pedidos", "1"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Atualizar Pedido",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"status\": \"confirmado\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/pedidos/1",
-              "host": ["{{base_url}}"],
-              "path": ["pedidos", "1"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Cancelar Pedido",
-          "request": {
-            "method": "PUT",
-            "url": {
-              "raw": "{{base_url}}/pedidos/1/cancelar",
-              "host": ["{{base_url}}"],
-              "path": ["pedidos", "1", "cancelar"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Deletar Pedido",
-          "request": {
-            "method": "DELETE",
-            "url": {
-              "raw": "{{base_url}}/pedidos/1",
-              "host": ["{{base_url}}"],
-              "path": ["pedidos", "1"]
-            }
-          },
-          "response": []
-        }
-      ]
     }
   ],
   "event": [
@@ -1061,11 +657,12 @@
         "type": "text/javascript",
         "exec": [
           "// Script para executar após cada request",
-          "// Exemplo: salvar token automaticamente após login",
+          "// Salvar token automaticamente após login",
           "if (pm.response.code === 200 && pm.request.url.path.includes('login')) {",
           "    const responseJson = pm.response.json();",
           "    if (responseJson.token) {",
           "        pm.collectionVariables.set('auth_token', responseJson.token);",
+          "        console.log('✅ Token salvo automaticamente!');",
           "    }",
           "}"
         ]

@@ -1,6 +1,6 @@
 const { Sequelize } = require("sequelize");
 const sequelize = require("../utils/db");
-const { ProdutoPedido } = require("./ProdutoPedido");
+const { Produto } = require("./Produto");
 const { Usuario } = require("./Usuarios");  // Para associação com Cliente
 
 const Pedido = sequelize.define(
@@ -11,12 +11,22 @@ const Pedido = sequelize.define(
       primaryKey: true,
       autoIncrement: true,
     },
-    produto_pedido_id: {
+    produto_id: {
       type: Sequelize.INTEGER,
       allowNull: false,
-      references: { model: "produtos_pedidos", key: "produto_pedido_id" },
+      references: { model: "produtos", key: "produto_id" },
     },
-    cliente_id: {  // Novo campo: Pedido feito por cliente
+    quantidade: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+    },
+    cliente_id: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      references: { model: "usuarios", key: "usuario_id" },
+    },
+    empresa_id: {
       type: Sequelize.INTEGER,
       allowNull: false,
       references: { model: "usuarios", key: "usuario_id" },
@@ -51,7 +61,8 @@ const Pedido = sequelize.define(
 );
 
 // Associações
-Pedido.belongsTo(ProdutoPedido, { foreignKey: "produto_pedido_id", as: "ProdutoPedido" });
-Pedido.belongsTo(Usuario, { foreignKey: "cliente_id", as: "Cliente" });  // Nova: Pedido pertence a Cliente
+Pedido.belongsTo(Produto, { foreignKey: "produto_id", as: "Produto" });
+Pedido.belongsTo(Usuario, { foreignKey: "cliente_id", as: "Cliente" });
+Pedido.belongsTo(Usuario, { foreignKey: "empresa_id", as: "Empresa" });
 
 module.exports = { Pedido };

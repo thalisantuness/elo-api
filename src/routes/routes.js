@@ -32,12 +32,6 @@ const ChatController = require("../controllers/chatController");
 const chatController = ChatController();
 const ProdutoController = require("../controllers/produtoController");
 const produtoController = ProdutoController();
-const ServicoPrestadoController = require("../controllers/servicoPrestadoController");
-const servicoPrestadoController = ServicoPrestadoController();
-const ProdutoPedidoController = require("../controllers/produtoPedidoController");
-const produtoPedidoController = ProdutoPedidoController();
-const AgendamentoController = require("../controllers/agendamentoController");
-const agendamentoController = AgendamentoController();
 const PedidoController = require("../controllers/pedidoController");
 const pedidoController = PedidoController();
 
@@ -53,41 +47,18 @@ router.delete("/usuarios/:id", usuariosController.deletar);
 
 router.get("/produtos", produtoController.listar);
 router.get("/produtos/:id", produtoController.buscarPorId);
-router.post("/produtos", produtoController.criar);
-router.put("/produtos/:id", produtoController.atualizar);
+router.post("/produtos", authMiddleware, produtoController.criar);
+router.put("/produtos/:id", authMiddleware, produtoController.atualizar);
 router.delete("/produtos/:id", produtoController.deletar);
 router.post("/produtos/:id/fotos", produtoController.adicionarFoto);
 
-// Serviços Prestados
-router.get("/servicos", servicoPrestadoController.listar);
-router.get("/servicos/:id", servicoPrestadoController.buscarPorId);
-router.post("/servicos", servicoPrestadoController.criar);
-router.put("/servicos/:id", servicoPrestadoController.atualizar);
-router.delete("/servicos/:id", servicoPrestadoController.excluir);
-
-// Produtos de Pedido
-router.get("/produtos-pedido", produtoPedidoController.listar);
-router.get("/produtos-pedido/:id", produtoPedidoController.buscarPorId);
-router.post("/produtos-pedido", produtoPedidoController.criar);
-router.put("/produtos-pedido/:id", produtoPedidoController.atualizar);
-router.delete("/produtos-pedido/:id", produtoPedidoController.excluir);
-
-// Agendamentos
-router.get("/agendamentos", agendamentoController.listar);
-router.post("/agendamentos", agendamentoController.criar);
-router.get("/agendamentos/:id", agendamentoController.buscarPorId);
-router.put("/agendamentos/:id", agendamentoController.atualizar);
-router.put("/agendamentos/:id/cancelar", agendamentoController.cancelar);
-router.put("/agendamentos/:id/remarcar", agendamentoController.remarcar);
-router.delete("/agendamentos/:id", agendamentoController.excluir);
-
 // Pedidos
-router.get("/pedidos", pedidoController.listar);
-router.post("/pedidos", pedidoController.criar);
-router.get("/pedidos/:id", pedidoController.buscarPorId);
-router.put("/pedidos/:id", pedidoController.atualizar);
-router.put("/pedidos/:id/cancelar", pedidoController.cancelar);
-router.delete("/pedidos/:id", pedidoController.excluir);
+router.get("/pedidos", authMiddleware, pedidoController.listar);
+router.post("/pedidos", authMiddleware, pedidoController.criar);
+router.get("/pedidos/:id", authMiddleware, pedidoController.buscarPorId);
+router.put("/pedidos/:id", authMiddleware, pedidoController.atualizar);
+router.put("/pedidos/:id/cancelar", authMiddleware, pedidoController.cancelar);
+router.delete("/pedidos/:id", authMiddleware, pedidoController.excluir);
 
 // Rotas de Chat
 router.get("/conversas", authMiddleware, chatController.listarConversas);

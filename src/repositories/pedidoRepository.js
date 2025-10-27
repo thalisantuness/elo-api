@@ -1,28 +1,25 @@
 const { Pedido } = require("../model/Pedido");
-const { Usuario } = require("../model/Usuarios");  // Para validação de cliente
+const { Usuario } = require("../model/Usuarios");
+const { Produto } = require("../model/Produto");
 
 async function listarPedidos(filtros = {}) {
   return Pedido.findAll({
     where: filtros,
     include: [
-      { association: "Cliente", attributes: ["usuario_id", "nome", "email", "role"] },  // Novo: Incluir Cliente
-      { 
-        association: "ProdutoPedido", 
-        include: [{ association: "Empresa", attributes: ["usuario_id", "nome", "email", "role"] }]  // Atualizado: Nested Empresa
-      }
+      { association: "Produto", attributes: ["produto_id", "nome", "valor", "foto_principal", "menu"] },
+      { association: "Cliente", attributes: ["usuario_id", "nome", "email", "role", "telefone"] },
+      { association: "Empresa", attributes: ["usuario_id", "nome", "email", "role", "telefone"] }
     ],
-    order: [["data_hora_entrega", "ASC"]],
+    order: [["data_cadastro", "DESC"]],
   });
 }
 
 async function buscarPedidoPorId(id) {
   const pedido = await Pedido.findByPk(id, { 
     include: [
-      { association: "Cliente", attributes: ["usuario_id", "nome", "email", "role"] },  // Novo
-      { 
-        association: "ProdutoPedido", 
-        include: [{ association: "Empresa", attributes: ["usuario_id", "nome", "email", "role"] }]  // Atualizado
-      }
+      { association: "Produto", attributes: ["produto_id", "nome", "valor", "foto_principal", "menu"] },
+      { association: "Cliente", attributes: ["usuario_id", "nome", "email", "role", "telefone"] },
+      { association: "Empresa", attributes: ["usuario_id", "nome", "email", "role", "telefone"] }
     ] 
   });
   if (!pedido) throw new Error("Pedido não encontrado");
@@ -30,21 +27,42 @@ async function buscarPedidoPorId(id) {
 }
 
 async function criarPedido(payload) {
-  const { produto_pedido_id, cliente_id, data_hora_entrega, status, observacao } = payload;  // Adicionado cliente_id
-  if (!produto_pedido_id || !cliente_id || !data_hora_entrega) {  // Validação cliente_id
-    throw new Error("'produto_pedido_id', 'cliente_id' e 'data_hora_entrega' são obrigatórios");
+  const { produto_id, cliente_id, empresa_id, quantidade, data_hora_entrega, status, observacao } = payload;
+  
+  if (!produto_id || !cliente_id || !empresa_id || !data_hora_entrega) {
+    throw new Error("'produto_id', 'cliente_id', 'empresa_id' e 'data_hora_entrega' são obrigatórios");
   }
 
-  // Validação: Checar se cliente existe (opcional: role 'cliente')
+  // Validar se produto existe
+  const produto = await Produto.findByPk(produto_id);
+  if (!produto) {
+    throw new Error("Produto não encontrado");
+  }
+
+  // Validar se empresa está autorizada a usar este produto
+  if (produto.empresas_autorizadas && produto.empresas_autorizadas.length > 0) {
+    if (!produto.empresas_autorizadas.includes(empresa_id)) {
+      throw new Error("Empresa não autorizada a usar este produto");
+    }
+  }
+
+  // Validar se cliente existe
   const cliente = await Usuario.findByPk(cliente_id);
   if (!cliente) {
     throw new Error("Cliente não encontrado");
   }
-  // Exemplo: if (cliente.role !== 'cliente') { throw new Error("Usuário deve ser cliente"); }
+
+  // Validar se empresa existe
+  const empresa = await Usuario.findByPk(empresa_id);
+  if (!empresa) {
+    throw new Error("Empresa não encontrada");
+  }
 
   return Pedido.create({ 
-    produto_pedido_id, 
-    cliente_id,  // Adicionado
+    produto_id,
+    cliente_id,
+    empresa_id,
+    quantidade: quantidade || 1,
     data_hora_entrega, 
     status: status || "pendente", 
     observacao: observacao || null 

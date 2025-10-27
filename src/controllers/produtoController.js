@@ -106,13 +106,55 @@ function ProdutoController() {
 
   async function criar(req, res) {
     try {
-      const { nome, valor, tipo_comercializacao, tipo_produto, estado_id, foto_principal, fotos_secundarias, valor_custo, quantidade } = req.body;
+      const { nome, valor, tipo_comercializacao, tipo_produto, estado_id, foto_principal, fotos_secundarias, valor_custo, quantidade, menu, empresas_autorizadas } = req.body;
+
+      // Validar autenticação
+      if (!req.user) {
+        return res.status(401).json({ error: 'Autenticação necessária para criar produto' });
+      }
 
       if (!nome || !valor || !valor_custo || !quantidade) {
         return res.status(400).json({ error: 'nome, valor, valor_custo e quantidade são obrigatórios' });
       }
 
-      const dados = { nome, valor, tipo_comercializacao, tipo_produto, estado_id, valor_custo, quantidade };
+      // Validar valores permitidos para o campo menu
+      const valoresMenuPermitidos = ['ecommerce', 'varejo', 'ambos'];
+      if (menu && !valoresMenuPermitidos.includes(menu)) {
+        return res.status(400).json({ 
+          error: 'Valor inválido para o campo menu',
+          valoresPermitidos: valoresMenuPermitidos
+        });
+      }
+
+      // Lógica de empresas_autorizadas baseada no role do usuário
+      let empresasAutorizadasFinal;
+      
+      if (req.user.role === 'empresa') {
+        // Se for empresa, só pode cadastrar para si mesmo
+        empresasAutorizadasFinal = [req.user.usuario_id];
+      } else if (req.user.role === 'admin') {
+        // Se for admin, pode selecionar empresas ou cadastrar para si mesmo
+        if (empresas_autorizadas && Array.isArray(empresas_autorizadas) && empresas_autorizadas.length > 0) {
+          empresasAutorizadasFinal = empresas_autorizadas;
+        } else {
+          empresasAutorizadasFinal = [req.user.usuario_id];
+        }
+      } else {
+        // Outros roles: cadastra para o próprio usuário
+        empresasAutorizadasFinal = [req.user.usuario_id];
+      }
+
+      const dados = { 
+        nome, 
+        valor, 
+        tipo_comercializacao, 
+        tipo_produto, 
+        estado_id, 
+        valor_custo, 
+        quantidade,
+        menu: menu || null,
+        empresas_autorizadas: empresasAutorizadasFinal
+      };
 
       if (foto_principal && foto_principal.startsWith('data:image')) {
         try {
@@ -168,6 +210,40 @@ function ProdutoController() {
     try {
       const { id } = req.params;
       const dados = req.body;
+
+      // Validar valores permitidos para o campo menu (se fornecido)
+      if (dados.menu) {
+        const valoresMenuPermitidos = ['ecommerce', 'varejo', 'ambos'];
+        if (!valoresMenuPermitidos.includes(dados.menu)) {
+          return res.status(400).json({ 
+            error: 'Valor inválido para o campo menu',
+            valoresPermitidos: valoresMenuPermitidos
+          });
+        }
+      }
+
+      // Lógica de empresas_autorizadas na atualização
+      if (dados.empresas_autorizadas !== undefined) {
+        // Validar autenticação
+        if (!req.user) {
+          return res.status(401).json({ error: 'Autenticação necessária' });
+        }
+        
+        if (req.user.role === 'empresa') {
+          // Empresa não pode alterar empresas_autorizadas
+          return res.status(403).json({ 
+            error: 'Usuários do tipo empresa não podem alterar o campo empresas_autorizadas' 
+          });
+        } else if (req.user.role === 'admin') {
+          // Admin pode alterar livremente
+          if (!Array.isArray(dados.empresas_autorizadas)) {
+            return res.status(400).json({ 
+              error: 'empresas_autorizadas deve ser um array de IDs' 
+            });
+          }
+        }
+      }
+
       const produto = await produtoRepo.atualizarProduto(id, dados);
       res.json(produto);
     } catch (e) {
