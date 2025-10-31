@@ -206,7 +206,12 @@ function ProdutoController() {
   async function atualizar(req, res) {
     try {
       const { id } = req.params;
-      const dados = req.body;
+      const dados = { ...req.body };
+
+      // Não sobrescrever foto_principal se não foi enviada
+      if (dados.foto_principal === undefined || dados.foto_principal === '') {
+        delete dados.foto_principal;
+      }
 
       // Validar valores permitidos para o campo menu (se fornecido)
       if (dados.menu) {

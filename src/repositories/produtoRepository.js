@@ -28,7 +28,8 @@ async function listarProdutos(filtros = {}) {
       tipo_produto: produtoData.tipo_produto,
       menu: produtoData.menu,
       empresas_autorizadas: produtoData.empresas_autorizadas,
-      imageData: produtoData.foto_principal,  // Principal como imageData
+      imageData: produtoData.foto_principal,  // Principal como imageData (compat)
+      foto_principal: produtoData.foto_principal, // Campo explícito para o frontend
       photos: photos,  // Secundárias como photos
       data_cadastro: produtoData.data_cadastro,
       data_update: produtoData.data_update
@@ -61,7 +62,8 @@ async function buscarProdutoPorId(id) {
     tipo_produto: produtoData.tipo_produto,
     menu: produtoData.menu,
     empresas_autorizadas: produtoData.empresas_autorizadas,
-    imageData: produtoData.foto_principal,  // Principal como imageData
+    imageData: produtoData.foto_principal,  // Principal como imageData (compat)
+    foto_principal: produtoData.foto_principal, // Campo explícito para o frontend
     photos: photos,  // Secundárias como photos
     data_cadastro: produtoData.data_cadastro,
     data_update: produtoData.data_update
