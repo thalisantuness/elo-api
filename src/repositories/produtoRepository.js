@@ -95,6 +95,19 @@ async function adicionarFoto(produto_id, imageData) {
   return await Foto.create({ produto_id, imageData });
 }
 
+async function deletarFoto(produto_id, photo_id) {
+  const foto = await Foto.findOne({ 
+    where: { photo_id, produto_id }
+  });
+  
+  if (!foto) {
+    throw new Error('Foto não encontrada ou não pertence a este produto');
+  }
+  
+  await foto.destroy();
+  return { message: 'Foto deletada com sucesso' };
+}
+
 module.exports = {
   listarProdutos,
   buscarProdutoPorId,
@@ -102,4 +115,5 @@ module.exports = {
   atualizarProduto,
   deletarProduto,
   adicionarFoto,
+  deletarFoto,
 };

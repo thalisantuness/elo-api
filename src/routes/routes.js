@@ -49,8 +49,9 @@ router.get("/produtos", produtoController.listar);
 router.get("/produtos/:id", produtoController.buscarPorId);
 router.post("/produtos", authMiddleware, produtoController.criar);
 router.put("/produtos/:id", authMiddleware, produtoController.atualizar);
+router.delete("/produtos/:id/fotos/:fotoId", authMiddleware, produtoController.deletarFoto);
 router.delete("/produtos/:id", produtoController.deletar);
-router.post("/produtos/:id/fotos", produtoController.adicionarFoto);
+router.post("/produtos/:id/fotos", authMiddleware, produtoController.adicionarFoto);
 
 // Pedidos
 router.get("/pedidos", authMiddleware, pedidoController.listar);

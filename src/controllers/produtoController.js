@@ -290,7 +290,18 @@ function ProdutoController() {
     }
   }
 
-  return { listar, buscarPorId, criar, atualizar, deletar, adicionarFoto };
+  async function deletarFoto(req, res) {
+    try {
+      const { id, fotoId } = req.params;
+      const resultado = await produtoRepo.deletarFoto(id, fotoId);
+      res.json(resultado);
+    } catch (e) {
+      console.error('Erro ao deletar foto:', e);
+      res.status(400).json({ error: e.message || 'Erro ao deletar foto' });
+    }
+  }
+
+  return { listar, buscarPorId, criar, atualizar, deletar, adicionarFoto, deletarFoto };
 }
 
 module.exports = ProdutoController;
