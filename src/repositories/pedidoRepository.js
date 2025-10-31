@@ -128,23 +128,57 @@ async function criarPedido(payload) {
 }
 
 async function atualizarPedido(id, dados) {
-  const pedido = await buscarPedidoPorId(id);
+  // Buscar pedido como instância do Sequelize (sem .toJSON())
+  const pedido = await Pedido.findByPk(id, {
+    include: [
+      { 
+        association: "Produto", 
+        attributes: ["produto_id", "nome", "valor", "foto_principal", "menu"],
+        required: false
+      },
+      { 
+        association: "Cliente", 
+        attributes: ["usuario_id", "nome", "email", "role", "telefone"],
+        required: false
+      },
+      { 
+        association: "Empresa", 
+        attributes: ["usuario_id", "nome", "email", "role", "telefone"],
+        required: false
+      }
+    ]
+  });
+
+  if (!pedido) {
+    throw new Error("Pedido não encontrado");
+  }
 
   // Validação adicional: Se alterando cliente, checar permissão (ex: admin)
   if (dados.cliente_id && dados.cliente_id !== pedido.cliente_id) {
     // Exemplo: throw new Error("Não autorizado a alterar cliente do pedido");
   }
 
-  return pedido.update(dados);
+  await pedido.update(dados);
+  
+  // Retornar pedido atualizado formatado
+  return buscarPedidoPorId(id);
 }
 
 async function cancelarPedido(id) {
-  const pedido = await buscarPedidoPorId(id);
-  return pedido.update({ status: "cancelado" });
+  const pedido = await Pedido.findByPk(id);
+  if (!pedido) {
+    throw new Error("Pedido não encontrado");
+  }
+  
+  await pedido.update({ status: "cancelado" });
+  return buscarPedidoPorId(id);
 }
 
 async function deletarPedido(id) {
-  const pedido = await buscarPedidoPorId(id);
+  const pedido = await Pedido.findByPk(id);
+  if (!pedido) {
+    throw new Error("Pedido não encontrado");
+  }
   return pedido.destroy();
 }
 
