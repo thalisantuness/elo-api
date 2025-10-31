@@ -85,9 +85,11 @@ async function buscarPedidoPorId(id) {
 async function criarPedido(payload) {
   const { produto_id, cliente_id, empresa_id, quantidade, data_hora_entrega, status, observacao } = payload;
   
-  if (!produto_id || !cliente_id || !empresa_id || !data_hora_entrega) {
-    throw new Error("'produto_id', 'cliente_id', 'empresa_id' e 'data_hora_entrega' são obrigatórios");
+  if (!produto_id || !cliente_id || !empresa_id) {
+    throw new Error("'produto_id', 'cliente_id' e 'empresa_id' são obrigatórios");
   }
+  
+  // data_hora_entrega é opcional (pode ser null)
 
   // Validar se produto existe
   const produto = await Produto.findByPk(produto_id);

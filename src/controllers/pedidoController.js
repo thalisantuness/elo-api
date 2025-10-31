@@ -26,11 +26,12 @@ function PedidoController() {
       }
 
       // Validar campos obrigatórios básicos
-      if (!produto_id || !data_hora_entrega) {
-        return res.status(400).json({ error: 'produto_id e data_hora_entrega são obrigatórios' });
+      if (!produto_id) {
+        return res.status(400).json({ error: 'produto_id é obrigatório' });
       }
       
       // Determinar cliente_id e empresa_id baseado no role
+      // data_hora_entrega é opcional (pode ser null para clientes)
       let clienteIdFinal = cliente_id;
       let empresaIdFinal = empresa_id;
       

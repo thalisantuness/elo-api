@@ -33,7 +33,7 @@ const Pedido = sequelize.define(
     },
     data_hora_entrega: {
       type: Sequelize.DATE,
-      allowNull: false,
+      allowNull: true,  // Opcional - cliente pode comprar sem definir data de entrega
     },
     status: {
       type: Sequelize.ENUM("pendente", "confirmado", "em_transporte", "entregue", "cancelado"),
