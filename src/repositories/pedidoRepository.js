@@ -3,27 +3,83 @@ const { Usuario } = require("../model/Usuarios");
 const { Produto } = require("../model/Produto");
 
 async function listarPedidos(filtros = {}) {
-  return Pedido.findAll({
+  const pedidos = await Pedido.findAll({
     where: filtros,
     include: [
-      { association: "Produto", attributes: ["produto_id", "nome", "valor", "foto_principal", "menu"] },
-      { association: "Cliente", attributes: ["usuario_id", "nome", "email", "role", "telefone"] },
-      { association: "Empresa", attributes: ["usuario_id", "nome", "email", "role", "telefone"] }
+      { 
+        association: "Produto", 
+        attributes: ["produto_id", "nome", "valor", "foto_principal", "menu"],
+        required: false  // LEFT JOIN - permite pedidos sem produto
+      },
+      { 
+        association: "Cliente", 
+        attributes: ["usuario_id", "nome", "email", "role", "telefone"],
+        required: false
+      },
+      { 
+        association: "Empresa", 
+        attributes: ["usuario_id", "nome", "email", "role", "telefone"],
+        required: false
+      }
     ],
     order: [["data_cadastro", "DESC"]],
+  });
+
+  // Formatar resposta para garantir que campos null não quebrem o frontend
+  return pedidos.map(pedido => {
+    const pedidoData = pedido.toJSON();
+    
+    // Se Produto for null, adicionar objeto vazio para evitar erro no frontend
+    if (!pedidoData.Produto) {
+      pedidoData.Produto = {
+        produto_id: pedidoData.produto_id,
+        nome: "Produto removido",
+        valor: 0,
+        foto_principal: null,
+        menu: null
+      };
+    }
+
+    return pedidoData;
   });
 }
 
 async function buscarPedidoPorId(id) {
   const pedido = await Pedido.findByPk(id, { 
     include: [
-      { association: "Produto", attributes: ["produto_id", "nome", "valor", "foto_principal", "menu"] },
-      { association: "Cliente", attributes: ["usuario_id", "nome", "email", "role", "telefone"] },
-      { association: "Empresa", attributes: ["usuario_id", "nome", "email", "role", "telefone"] }
+      { 
+        association: "Produto", 
+        attributes: ["produto_id", "nome", "valor", "foto_principal", "menu"],
+        required: false
+      },
+      { 
+        association: "Cliente", 
+        attributes: ["usuario_id", "nome", "email", "role", "telefone"],
+        required: false
+      },
+      { 
+        association: "Empresa", 
+        attributes: ["usuario_id", "nome", "email", "role", "telefone"],
+        required: false
+      }
     ] 
   });
   if (!pedido) throw new Error("Pedido não encontrado");
-  return pedido;
+  
+  const pedidoData = pedido.toJSON();
+  
+  // Se Produto for null, adicionar objeto vazio para evitar erro no frontend
+  if (!pedidoData.Produto) {
+    pedidoData.Produto = {
+      produto_id: pedidoData.produto_id,
+      nome: "Produto removido",
+      valor: 0,
+      foto_principal: null,
+      menu: null
+    };
+  }
+  
+  return pedidoData;
 }
 
 async function criarPedido(payload) {
