@@ -126,23 +126,20 @@ function ProdutoController() {
         });
       }
 
-      // Lógica de empresas_autorizadas baseada no role do usuário
-      let empresasAutorizadasFinal;
-      
-      if (req.user.role === 'empresa') {
-        // Se for empresa, só pode cadastrar para si mesmo
-        empresasAutorizadasFinal = [req.user.usuario_id];
-      } else if (req.user.role === 'admin') {
-        // Se for admin, pode selecionar empresas ou cadastrar para si mesmo
-        if (empresas_autorizadas && Array.isArray(empresas_autorizadas) && empresas_autorizadas.length > 0) {
-          empresasAutorizadasFinal = empresas_autorizadas;
-        } else {
-          empresasAutorizadasFinal = [req.user.usuario_id];
-        }
-      } else {
-        // Outros roles: cadastra para o próprio usuário
-        empresasAutorizadasFinal = [req.user.usuario_id];
-      }
+      // Lógica de empresas_autorizadas desativada temporariamente
+      // let empresasAutorizadasFinal;
+      // if (req.user.role === 'empresa') {
+      //   empresasAutorizadasFinal = [req.user.usuario_id];
+      // } else if (req.user.role === 'admin') {
+      //   if (empresas_autorizadas && Array.isArray(empresas_autorizadas) && empresas_autorizadas.length > 0) {
+      //     empresasAutorizadasFinal = empresas_autorizadas;
+      //   } else {
+      //     empresasAutorizadasFinal = [req.user.usuario_id];
+      //   }
+      // } else {
+      //   empresasAutorizadasFinal = [req.user.usuario_id];
+      // }
+      const empresasAutorizadasFinal = null; // desativado
 
       const dados = { 
         nome, 
@@ -222,27 +219,23 @@ function ProdutoController() {
         }
       }
 
-      // Lógica de empresas_autorizadas na atualização
-      if (dados.empresas_autorizadas !== undefined) {
-        // Validar autenticação
-        if (!req.user) {
-          return res.status(401).json({ error: 'Autenticação necessária' });
-        }
-        
-        if (req.user.role === 'empresa') {
-          // Empresa não pode alterar empresas_autorizadas
-          return res.status(403).json({ 
-            error: 'Usuários do tipo empresa não podem alterar o campo empresas_autorizadas' 
-          });
-        } else if (req.user.role === 'admin') {
-          // Admin pode alterar livremente
-          if (!Array.isArray(dados.empresas_autorizadas)) {
-            return res.status(400).json({ 
-              error: 'empresas_autorizadas deve ser um array de IDs' 
-            });
-          }
-        }
-      }
+      // Lógica de empresas_autorizadas na atualização desativada temporariamente
+      // if (dados.empresas_autorizadas !== undefined) {
+      //   if (!req.user) {
+      //     return res.status(401).json({ error: 'Autenticação necessária' });
+      //   }
+      //   if (req.user.role === 'empresa') {
+      //     return res.status(403).json({ 
+      //       error: 'Usuários do tipo empresa não podem alterar o campo empresas_autorizadas' 
+      //     });
+      //   } else if (req.user.role === 'admin') {
+      //     if (!Array.isArray(dados.empresas_autorizadas)) {
+      //       return res.status(400).json({ 
+      //         error: 'empresas_autorizadas deve ser um array de IDs' 
+      //       });
+      //     }
+      //   }
+      // }
 
       const produto = await produtoRepo.atualizarProduto(id, dados);
       res.json(produto);

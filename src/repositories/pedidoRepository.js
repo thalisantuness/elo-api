@@ -39,12 +39,12 @@ async function criarPedido(payload) {
     throw new Error("Produto não encontrado");
   }
 
-  // Validar se empresa está autorizada a usar este produto
-  if (produto.empresas_autorizadas && produto.empresas_autorizadas.length > 0) {
-    if (!produto.empresas_autorizadas.includes(empresa_id)) {
-      throw new Error("Empresa não autorizada a usar este produto");
-    }
-  }
+  // Validação de empresas_autorizadas desativada temporariamente
+  // if (produto.empresas_autorizadas && produto.empresas_autorizadas.length > 0) {
+  //   if (!produto.empresas_autorizadas.includes(empresa_id)) {
+  //     throw new Error("Empresa não autorizada a usar este produto");
+  //   }
+  // }
 
   // Validar se cliente existe
   const cliente = await Usuario.findByPk(cliente_id);
