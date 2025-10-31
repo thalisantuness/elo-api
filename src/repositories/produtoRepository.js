@@ -13,10 +13,29 @@ async function listarProdutos(filtros = {}) {
     const produtoData = produto.toJSON();
     
     // Criar array de fotos secundárias no formato correto
-    const photos = produtoData.fotos ? produtoData.fotos.map(foto => ({
-      photo_id: foto.photo_id,
-      imageData: foto.imageData
-    })) : [];
+    const photos = produtoData.fotos ? produtoData.fotos
+      .map(foto => {
+        // Garantir que fotos secundárias nunca retornem base64
+        let imageDataFinal = foto.imageData;
+        if (imageDataFinal && imageDataFinal.startsWith('data:image')) {
+          console.warn(`Foto ${foto.photo_id} tem base64. Limpando.`);
+          imageDataFinal = null;
+        }
+        return {
+          photo_id: foto.photo_id,
+          imageData: imageDataFinal
+        };
+      })
+      .filter(foto => foto.imageData !== null) // Remover fotos inválidas
+      : [];
+
+    // Garantir que nunca retornamos base64, apenas URLs do S3
+    let fotoPrincipalFinal = produtoData.foto_principal;
+    if (fotoPrincipalFinal && fotoPrincipalFinal.startsWith('data:image')) {
+      // Se por algum motivo tiver base64 no banco, retornar null ou limpar
+      console.warn(`Produto ${produtoData.produto_id} tem base64 em foto_principal. Limpando.`);
+      fotoPrincipalFinal = null; // Não retornar base64
+    }
 
     return {
       produto_id: produtoData.produto_id,
@@ -28,8 +47,8 @@ async function listarProdutos(filtros = {}) {
       tipo_produto: produtoData.tipo_produto,
       menu: produtoData.menu,
       empresas_autorizadas: produtoData.empresas_autorizadas,
-      imageData: produtoData.foto_principal,  // Principal como imageData (compat)
-      foto_principal: produtoData.foto_principal, // Campo explícito para o frontend
+      imageData: fotoPrincipalFinal,  // Principal como imageData (compat)
+      foto_principal: fotoPrincipalFinal, // Campo explícito para o frontend
       photos: photos,  // Secundárias como photos
       data_cadastro: produtoData.data_cadastro,
       data_update: produtoData.data_update
@@ -47,10 +66,29 @@ async function buscarProdutoPorId(id) {
   const produtoData = produto.toJSON();
   
   // Criar array de fotos secundárias no formato correto
-  const photos = produtoData.fotos ? produtoData.fotos.map(foto => ({
-    photo_id: foto.photo_id,
-    imageData: foto.imageData
-  })) : [];
+  const photos = produtoData.fotos ? produtoData.fotos
+    .map(foto => {
+      // Garantir que fotos secundárias nunca retornem base64
+      let imageDataFinal = foto.imageData;
+      if (imageDataFinal && imageDataFinal.startsWith('data:image')) {
+        console.warn(`Foto ${foto.photo_id} tem base64. Limpando.`);
+        imageDataFinal = null;
+      }
+      return {
+        photo_id: foto.photo_id,
+        imageData: imageDataFinal
+      };
+    })
+    .filter(foto => foto.imageData !== null) // Remover fotos inválidas
+    : [];
+
+  // Garantir que nunca retornamos base64, apenas URLs do S3
+  let fotoPrincipalFinal = produtoData.foto_principal;
+  if (fotoPrincipalFinal && fotoPrincipalFinal.startsWith('data:image')) {
+    // Se por algum motivo tiver base64 no banco, retornar null ou limpar
+    console.warn(`Produto ${produtoData.produto_id} tem base64 em foto_principal. Limpando.`);
+    fotoPrincipalFinal = null; // Não retornar base64
+  }
 
   return {
     produto_id: produtoData.produto_id,
@@ -62,8 +100,8 @@ async function buscarProdutoPorId(id) {
     tipo_produto: produtoData.tipo_produto,
     menu: produtoData.menu,
     empresas_autorizadas: produtoData.empresas_autorizadas,
-    imageData: produtoData.foto_principal,  // Principal como imageData (compat)
-    foto_principal: produtoData.foto_principal, // Campo explícito para o frontend
+    imageData: fotoPrincipalFinal,  // Principal como imageData (compat)
+    foto_principal: fotoPrincipalFinal, // Campo explícito para o frontend
     photos: photos,  // Secundárias como photos
     data_cadastro: produtoData.data_cadastro,
     data_update: produtoData.data_update

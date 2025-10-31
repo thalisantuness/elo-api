@@ -208,9 +208,36 @@ function ProdutoController() {
       const { id } = req.params;
       const dados = { ...req.body };
 
-      // Não sobrescrever foto_principal se não foi enviada
-      if (dados.foto_principal === undefined || dados.foto_principal === '') {
+      // Processar foto_principal se for base64 (converter para S3)
+      if (dados.foto_principal && dados.foto_principal.startsWith('data:image')) {
+        try {
+          // Validar base64
+          const base64Data = validateBase64Image(dados.foto_principal);
+          console.log('Processando foto principal no update, tamanho base64:', base64Data.length);
+          
+          const buffer = Buffer.from(base64Data, 'base64');
+          console.log('Buffer criado, tamanho:', buffer.length);
+          
+          const compressed = await compressImage(buffer);
+          console.log('Imagem comprimida, tamanho:', compressed.length);
+          
+          dados.foto_principal = await uploadToS3(compressed, 'produtos/principal');
+          console.log('Foto principal salva no S3:', dados.foto_principal);
+        } catch (error) {
+          console.error('Erro ao fazer upload da foto principal para S3:', error.message);
+          return res.status(400).json({ 
+            error: `Erro ao processar foto principal: ${error.message}`,
+            details: 'Verifique se a imagem está em formato válido (JPEG, PNG, etc.) e se o base64 está completo'
+          });
+        }
+      } else if (dados.foto_principal === '' || dados.foto_principal === null) {
+        // Se enviar string vazia ou null, não atualizar (manter atual)
         delete dados.foto_principal;
+      } else if (dados.foto_principal && !dados.foto_principal.startsWith('http')) {
+        // Se não for base64 nem URL válida, pode ser um erro
+        return res.status(400).json({ 
+          error: 'foto_principal deve ser uma URL do S3 ou base64 (data:image/...)'
+        });
       }
 
       // Validar valores permitidos para o campo menu (se fornecido)
