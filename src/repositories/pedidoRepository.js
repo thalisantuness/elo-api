@@ -13,7 +13,7 @@ async function listarPedidos(filtros = {}) {
       },
       { 
         association: "Cliente", 
-        attributes: ["usuario_id", "nome", "email", "role", "telefone"],
+        attributes: ["usuario_id", "nome", "email", "role", "telefone", "cliente_endereco"],
         required: false
       },
       { 
@@ -54,7 +54,7 @@ async function buscarPedidoPorId(id) {
       },
       { 
         association: "Cliente", 
-        attributes: ["usuario_id", "nome", "email", "role", "telefone"],
+        attributes: ["usuario_id", "nome", "email", "role", "telefone", "cliente_endereco"],
         required: false
       },
       { 
@@ -138,7 +138,7 @@ async function atualizarPedido(id, dados) {
       },
       { 
         association: "Cliente", 
-        attributes: ["usuario_id", "nome", "email", "role", "telefone"],
+        attributes: ["usuario_id", "nome", "email", "role", "telefone", "cliente_endereco"],
         required: false
       },
       { 
