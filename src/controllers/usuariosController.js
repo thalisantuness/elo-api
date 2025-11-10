@@ -7,7 +7,7 @@ const { Sequelize, Op } = require("sequelize");
 function UsuarioController() {
   async function cadastrar(req, res) {
     try {
-      const { nome, telefone, email, senha, role, foto_perfil } = req.body;
+      const { nome, telefone, email, senha, role, foto_perfil, cliente_endereco } = req.body;
 
       // Validações básicas
       if (!nome || !telefone || !email || !senha || !role) {
@@ -57,7 +57,8 @@ function UsuarioController() {
           telefone: telefoneLimpo,
           email,
           senha,
-          role
+          role,
+          cliente_endereco: cliente_endereco || null
         },
         fotoPerfilBase64: foto_perfil
       });
@@ -178,7 +179,8 @@ function UsuarioController() {
             telefone: usuario.telefone,
             email: usuario.email,
             role: usuario.role,
-            foto_perfil: usuario.foto_perfil  // Link do S3
+            foto_perfil: usuario.foto_perfil,  // Link do S3
+            cliente_endereco: usuario.cliente_endereco
           };
         })
       );

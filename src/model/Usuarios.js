@@ -34,6 +34,10 @@ const Usuario = sequelize.define(
       type: Sequelize.TEXT,  // Igual produtos: TEXT ilimitado pra links S3
       allowNull: true,
     },
+    cliente_endereco: {
+      type: Sequelize.TEXT,
+      allowNull: true,
+    },
     data_cadastro: {
       type: Sequelize.DATE,
       defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
