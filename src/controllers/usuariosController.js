@@ -220,6 +220,8 @@ function UsuarioController() {
       delete dadosAtualizacao.role;
       delete dadosAtualizacao.foto_perfil; // Atualizar foto por endpoint separado
 
+      // Campos permitidos: nome, telefone, email, cliente_endereco (e outros campos do model exceto os bloqueados acima)
+
       // Validar telefone se fornecido
       if (dadosAtualizacao.telefone) {
         const telefoneLimpo = dadosAtualizacao.telefone.replace(/\D/g, '');
