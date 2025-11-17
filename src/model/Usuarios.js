@@ -10,7 +10,7 @@ const Usuario = sequelize.define(
       autoIncrement: true,
     },
     role: {
-      type: Sequelize.STRING,
+      type: Sequelize.STRING, 
       allowNull: false,
     },
     nome: {
