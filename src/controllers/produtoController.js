@@ -83,18 +83,22 @@ function ProdutoController() {
 
   async function listar(req, res) {
     try {
+      const { Op } = require('sequelize');
+      const usuariosRepo = require('../repositories/usuariosRepository');
       const filtros = req.query || {};
       
       // Lógica de filtragem baseada no role
       if (req.user) {
         if (req.user.role === 'empresa') {
-          // Empresa vê apenas seus produtos
-          filtros.empresa_id = req.user.usuario_id;
+          // Empresa vê seus produtos + produtos de todas as empresas filhas (recursivamente)
+          const idsEmpresas = await usuariosRepo.buscarIdsEmpresasFilhas(req.user.usuario_id);
+          filtros.empresa_id = { [Op.in]: idsEmpresas };
         } else if (req.user.role === 'empresa-funcionario') {
-          // Funcionário vê produtos da empresa pai
-          const funcionario = await require('../repositories/usuariosRepository').buscarUsuarioPorId(req.user.usuario_id);
+          // Funcionário vê produtos da empresa pai + produtos de todas as empresas filhas
+          const funcionario = await usuariosRepo.buscarUsuarioPorId(req.user.usuario_id);
           if (funcionario && funcionario.empresa_pai_id) {
-            filtros.empresa_id = funcionario.empresa_pai_id;
+            const idsEmpresas = await usuariosRepo.buscarIdsEmpresasFilhas(funcionario.empresa_pai_id);
+            filtros.empresa_id = { [Op.in]: idsEmpresas };
           } else {
             // Se não tem empresa_pai_id, retornar vazio
             return res.json([]);

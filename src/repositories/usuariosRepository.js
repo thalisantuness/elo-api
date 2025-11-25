@@ -205,6 +205,41 @@ async function listarUsuarios(filtros = {}) {
   return usuarios;  // foto_perfil já é link
 }
 
+/**
+ * Busca todos os IDs de empresas filhas (incluindo recursivamente)
+ * @param {number} empresaPaiId - ID da empresa pai
+ * @param {Set<number>} visitados - IDs já visitados (para evitar loops infinitos)
+ * @returns {Promise<number[]>} Array com IDs da empresa pai + todas as empresas filhas
+ */
+async function buscarIdsEmpresasFilhas(empresaPaiId, visitados = new Set()) {
+  // Proteção contra loops infinitos
+  if (visitados.has(empresaPaiId)) {
+    return [];
+  }
+  visitados.add(empresaPaiId);
+  
+  // Incluir a própria empresa pai
+  const idsEmpresas = [empresaPaiId];
+  
+  // Buscar empresas filhas diretas
+  const empresasFilhas = await Usuario.findAll({
+    where: {
+      role: 'empresa',
+      empresa_pai_id: empresaPaiId
+    },
+    attributes: ['usuario_id']
+  });
+  
+  // Buscar empresas filhas recursivamente (empresas filhas de empresas filhas)
+  for (const empresaFilha of empresasFilhas) {
+    const empresasNetas = await buscarIdsEmpresasFilhas(empresaFilha.usuario_id, visitados);
+    idsEmpresas.push(...empresasNetas);
+  }
+  
+  // Remover duplicatas
+  return [...new Set(idsEmpresas)];
+}
+
 module.exports = {
   criarUsuario,
   buscarUsuarioPorId,
@@ -215,4 +250,5 @@ module.exports = {
   buscarUsuarioPorIdComSenha,
   atualizarFotoPerfil,
   listarUsuarios,
+  buscarIdsEmpresasFilhas,
 };

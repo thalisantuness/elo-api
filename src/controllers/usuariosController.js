@@ -50,11 +50,11 @@ function UsuarioController() {
         }
       }
 
-      // Lógica de empresa_pai_id: se empresa logada cria funcionário/cliente, vincular automaticamente
+      // Lógica de empresa_pai_id: se empresa logada cria funcionário/cliente/empresa filha, vincular automaticamente
       let empresaPaiIdFinal = empresa_pai_id || null;
       if (req.user && req.user.role === 'empresa') {
-        // Se empresa está criando um funcionário ou cliente, vincular a ela
-        if (role === 'empresa-funcionario' || role === 'cliente') {
+        // Se empresa está criando um funcionário, cliente ou outra empresa, vincular a ela
+        if (role === 'empresa-funcionario' || role === 'cliente' || role === 'empresa') {
           empresaPaiIdFinal = req.user.usuario_id;
         }
       }
@@ -152,23 +152,25 @@ function UsuarioController() {
           break;
           
         case 'empresa':
-          // Empresa vê apenas seus funcionários e clientes vinculados
+          // Empresa vê seus funcionários, clientes e empresas filhas vinculadas
           whereClause[Op.or] = [
             { role: 'empresa-funcionario', empresa_pai_id: req.user.usuario_id },
-            { role: 'cliente', empresa_pai_id: req.user.usuario_id }
+            { role: 'cliente', empresa_pai_id: req.user.usuario_id },
+            { role: 'empresa', empresa_pai_id: req.user.usuario_id } // Empresas filhas
           ];
-          console.log('🏢 Empresa logada - mostrando funcionários e clientes vinculados');
+          console.log('🏢 Empresa logada - mostrando funcionários, clientes e empresas filhas vinculadas');
           break;
           
         case 'empresa-funcionario':
-          // Funcionário vê os mesmos dados da empresa pai
+          // Funcionário vê os mesmos dados da empresa pai (funcionários, clientes e empresas filhas)
           const funcionario = await usuariosRepository.buscarUsuarioPorId(req.user.usuario_id);
           if (funcionario && funcionario.empresa_pai_id) {
             whereClause[Op.or] = [
               { role: 'empresa-funcionario', empresa_pai_id: funcionario.empresa_pai_id },
-              { role: 'cliente', empresa_pai_id: funcionario.empresa_pai_id }
+              { role: 'cliente', empresa_pai_id: funcionario.empresa_pai_id },
+              { role: 'empresa', empresa_pai_id: funcionario.empresa_pai_id } // Empresas filhas
             ];
-            console.log('👔 Funcionário logado - mostrando funcionários e clientes da empresa pai');
+            console.log('👔 Funcionário logado - mostrando funcionários, clientes e empresas filhas da empresa pai');
           } else {
             // Se não tem empresa_pai_id, não mostra nada
             whereClause.usuario_id = { [Op.eq]: -1 }; // ID inexistente
