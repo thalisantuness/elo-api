@@ -12,13 +12,18 @@ function validarPermissaoConversa(roleRemetente, roleDestinatario) {
     return true;
   }
   
-  // Cliente só pode conversar com empresa
-  if (roleRemetente === 'cliente' && roleDestinatario === 'empresa') {
+  // Cliente só pode conversar com empresa ou funcionário
+  if (roleRemetente === 'cliente' && (roleDestinatario === 'empresa' || roleDestinatario === 'empresa-funcionario')) {
     return true;
   }
   
   // Empresa só pode conversar com cliente
   if (roleRemetente === 'empresa' && roleDestinatario === 'cliente') {
+    return true;
+  }
+  
+  // Funcionário só pode conversar com cliente
+  if (roleRemetente === 'empresa-funcionario' && roleDestinatario === 'cliente') {
     return true;
   }
   

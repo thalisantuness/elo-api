@@ -84,6 +84,25 @@ function ProdutoController() {
   async function listar(req, res) {
     try {
       const filtros = req.query || {};
+      
+      // Lógica de filtragem baseada no role
+      if (req.user) {
+        if (req.user.role === 'empresa') {
+          // Empresa vê apenas seus produtos
+          filtros.empresa_id = req.user.usuario_id;
+        } else if (req.user.role === 'empresa-funcionario') {
+          // Funcionário vê produtos da empresa pai
+          const funcionario = await require('../repositories/usuariosRepository').buscarUsuarioPorId(req.user.usuario_id);
+          if (funcionario && funcionario.empresa_pai_id) {
+            filtros.empresa_id = funcionario.empresa_pai_id;
+          } else {
+            // Se não tem empresa_pai_id, retornar vazio
+            return res.json([]);
+          }
+        }
+        // Admin e cliente veem todos os produtos (marketplace) - não filtra por empresa_id
+      }
+      
       const produtos = await produtoRepo.listarProdutos(filtros);
       res.json(produtos);
     } catch (e) {
@@ -106,7 +125,7 @@ function ProdutoController() {
 
   async function criar(req, res) {
     try {
-      const { nome, valor, tipo_comercializacao, tipo_produto, estado_id, foto_principal, fotos_secundarias, valor_custo, quantidade, menu, empresas_autorizadas } = req.body;
+      const { nome, valor, tipo_comercializacao, tipo_produto, estado_id, foto_principal, fotos_secundarias, valor_custo, quantidade, empresa_id } = req.body;
 
       // Validar autenticação
       if (!req.user) {
@@ -117,29 +136,28 @@ function ProdutoController() {
         return res.status(400).json({ error: 'nome, valor, valor_custo e quantidade são obrigatórios' });
       }
 
-      // Validar valores permitidos para o campo menu
-      const valoresMenuPermitidos = ['ecommerce', 'varejo', 'ambos'];
-      if (menu && !valoresMenuPermitidos.includes(menu)) {
-        return res.status(400).json({ 
-          error: 'Valor inválido para o campo menu',
-          valoresPermitidos: valoresMenuPermitidos
-        });
+      // Determinar empresa_id baseado no role
+      let empresaIdFinal = empresa_id;
+      if (req.user.role === 'empresa') {
+        // Empresa cria produto para si mesma
+        empresaIdFinal = req.user.usuario_id;
+      } else if (req.user.role === 'empresa-funcionario') {
+        // Funcionário cria produto para a empresa pai
+        const funcionario = await require('../repositories/usuariosRepository').buscarUsuarioPorId(req.user.usuario_id);
+        if (!funcionario || !funcionario.empresa_pai_id) {
+          return res.status(403).json({ error: 'Funcionário não vinculado a uma empresa' });
+        }
+        empresaIdFinal = funcionario.empresa_pai_id;
+      } else if (req.user.role === 'admin') {
+        // Admin pode especificar empresa_id ou usar seu próprio ID
+        empresaIdFinal = empresa_id || req.user.usuario_id;
+      } else {
+        return res.status(403).json({ error: 'Apenas empresas, funcionários e admins podem criar produtos' });
       }
 
-      // Lógica de empresas_autorizadas desativada temporariamente
-      // let empresasAutorizadasFinal;
-      // if (req.user.role === 'empresa') {
-      //   empresasAutorizadasFinal = [req.user.usuario_id];
-      // } else if (req.user.role === 'admin') {
-      //   if (empresas_autorizadas && Array.isArray(empresas_autorizadas) && empresas_autorizadas.length > 0) {
-      //     empresasAutorizadasFinal = empresas_autorizadas;
-      //   } else {
-      //     empresasAutorizadasFinal = [req.user.usuario_id];
-      //   }
-      // } else {
-      //   empresasAutorizadasFinal = [req.user.usuario_id];
-      // }
-      const empresasAutorizadasFinal = null; // desativado
+      if (!empresaIdFinal) {
+        return res.status(400).json({ error: 'empresa_id é obrigatório' });
+      }
 
       const dados = { 
         nome, 
@@ -149,8 +167,7 @@ function ProdutoController() {
         estado_id, 
         valor_custo, 
         quantidade,
-        menu: menu || null,
-        empresas_autorizadas: empresasAutorizadasFinal
+        empresa_id: empresaIdFinal
       };
 
       if (foto_principal && foto_principal.startsWith('data:image')) {
@@ -240,16 +257,8 @@ function ProdutoController() {
         });
       }
 
-      // Validar valores permitidos para o campo menu (se fornecido)
-      if (dados.menu) {
-        const valoresMenuPermitidos = ['ecommerce', 'varejo', 'ambos'];
-        if (!valoresMenuPermitidos.includes(dados.menu)) {
-          return res.status(400).json({ 
-            error: 'Valor inválido para o campo menu',
-            valoresPermitidos: valoresMenuPermitidos
-          });
-        }
-      }
+      // Remover menu dos dados (não é mais usado)
+      delete dados.menu;
 
       // Lógica de empresas_autorizadas na atualização desativada temporariamente
       // if (dados.empresas_autorizadas !== undefined) {

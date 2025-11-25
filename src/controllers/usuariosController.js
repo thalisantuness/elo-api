@@ -7,7 +7,7 @@ const { Sequelize, Op } = require("sequelize");
 function UsuarioController() {
   async function cadastrar(req, res) {
     try {
-      const { nome, telefone, email, senha, role, foto_perfil, cliente_endereco } = req.body;
+      const { nome, telefone, email, senha, role, foto_perfil, cliente_endereco, empresa_pai_id } = req.body;
 
       // Validações básicas
       if (!nome || !telefone || !email || !senha || !role) {
@@ -17,9 +17,9 @@ function UsuarioController() {
       }
 
       // Validar role
-      if (!["cliente", "empresa", "admin"].includes(role)) {
+      if (!["cliente", "empresa", "admin", "empresa-funcionario"].includes(role)) {
         return res.status(400).json({ 
-          error: "Role inválido. Use 'cliente', 'empresa' ou 'admin'." 
+          error: "Role inválido. Use 'cliente', 'empresa', 'admin' ou 'empresa-funcionario'." 
         });
       }
 
@@ -50,6 +50,15 @@ function UsuarioController() {
         }
       }
 
+      // Lógica de empresa_pai_id: se empresa logada cria funcionário/cliente, vincular automaticamente
+      let empresaPaiIdFinal = empresa_pai_id || null;
+      if (req.user && req.user.role === 'empresa') {
+        // Se empresa está criando um funcionário ou cliente, vincular a ela
+        if (role === 'empresa-funcionario' || role === 'cliente') {
+          empresaPaiIdFinal = req.user.usuario_id;
+        }
+      }
+
       // Criar usuário - repo valida/comprime/upload e salva link
       const usuarioCriado = await usuariosRepository.criarUsuario({
         usuario: {
@@ -58,7 +67,8 @@ function UsuarioController() {
           email,
           senha,
           role,
-          cliente_endereco: cliente_endereco || null
+          cliente_endereco: cliente_endereco || null,
+          empresa_pai_id: empresaPaiIdFinal
         },
         fotoPerfilBase64: foto_perfil
       });
@@ -114,7 +124,8 @@ function UsuarioController() {
           role: usuario.role,
           nome: usuario.nome,
           telefone: usuario.telefone,
-          foto_perfil: usuario.foto_perfil  // Já é link do S3
+          foto_perfil: usuario.foto_perfil,  // Já é link do S3
+          empresa_pai_id: usuario.empresa_pai_id || null
         },
         token
       };
@@ -141,9 +152,27 @@ function UsuarioController() {
           break;
           
         case 'empresa':
-          // Empresa vê empresas e clientes (não vê admins)
-          whereClause.role = { [Op.in]: ['empresa', 'cliente'] };
-          console.log('🏢 Empresa logada - mostrando empresas e clientes');
+          // Empresa vê apenas seus funcionários e clientes vinculados
+          whereClause[Op.or] = [
+            { role: 'empresa-funcionario', empresa_pai_id: req.user.usuario_id },
+            { role: 'cliente', empresa_pai_id: req.user.usuario_id }
+          ];
+          console.log('🏢 Empresa logada - mostrando funcionários e clientes vinculados');
+          break;
+          
+        case 'empresa-funcionario':
+          // Funcionário vê os mesmos dados da empresa pai
+          const funcionario = await usuariosRepository.buscarUsuarioPorId(req.user.usuario_id);
+          if (funcionario && funcionario.empresa_pai_id) {
+            whereClause[Op.or] = [
+              { role: 'empresa-funcionario', empresa_pai_id: funcionario.empresa_pai_id },
+              { role: 'cliente', empresa_pai_id: funcionario.empresa_pai_id }
+            ];
+            console.log('👔 Funcionário logado - mostrando funcionários e clientes da empresa pai');
+          } else {
+            // Se não tem empresa_pai_id, não mostra nada
+            whereClause.usuario_id = { [Op.eq]: -1 }; // ID inexistente
+          }
           break;
           
         case 'cliente':
@@ -180,7 +209,8 @@ function UsuarioController() {
             email: usuario.email,
             role: usuario.role,
             foto_perfil: usuario.foto_perfil,  // Link do S3
-            cliente_endereco: usuario.cliente_endereco
+            cliente_endereco: usuario.cliente_endereco,
+            empresa_pai_id: usuario.empresa_pai_id
           };
         })
       );

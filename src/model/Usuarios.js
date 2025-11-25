@@ -38,6 +38,14 @@ const Usuario = sequelize.define(
       type: Sequelize.TEXT,
       allowNull: true,
     },
+    empresa_pai_id: {
+      type: Sequelize.INTEGER,
+      allowNull: true,
+      references: {
+        model: "usuarios",
+        key: "usuario_id",
+      },
+    },
     data_cadastro: {
       type: Sequelize.DATE,
       defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),

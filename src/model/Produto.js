@@ -34,9 +34,13 @@ const Produto = sequelize.define(
       type: Sequelize.STRING,
       allowNull: false,
     },
-    menu: {
-      type: Sequelize.STRING,
-      allowNull: true,
+    empresa_id: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      references: {
+        model: "usuarios",
+        key: "usuario_id",
+      },
     },
     empresas_autorizadas: {
       type: Sequelize.ARRAY(Sequelize.INTEGER),

@@ -8,7 +8,7 @@ async function listarPedidos(filtros = {}) {
     include: [
       { 
         association: "Produto", 
-        attributes: ["produto_id", "nome", "valor", "foto_principal", "menu"],
+        attributes: ["produto_id", "nome", "valor", "foto_principal", "empresa_id"],
         required: false  // LEFT JOIN - permite pedidos sem produto
       },
       { 
@@ -36,7 +36,7 @@ async function listarPedidos(filtros = {}) {
         nome: "Produto removido",
         valor: 0,
         foto_principal: null,
-        menu: null
+        empresa_id: null
       };
     }
 
@@ -49,7 +49,7 @@ async function buscarPedidoPorId(id) {
     include: [
       { 
         association: "Produto", 
-        attributes: ["produto_id", "nome", "valor", "foto_principal", "menu"],
+        attributes: ["produto_id", "nome", "valor", "foto_principal", "empresa_id"],
         required: false
       },
       { 
@@ -70,13 +70,13 @@ async function buscarPedidoPorId(id) {
   
   // Se Produto for null, adicionar objeto vazio para evitar erro no frontend
   if (!pedidoData.Produto) {
-    pedidoData.Produto = {
-      produto_id: pedidoData.produto_id,
-      nome: "Produto removido",
-      valor: 0,
-      foto_principal: null,
-      menu: null
-    };
+      pedidoData.Produto = {
+        produto_id: pedidoData.produto_id,
+        nome: "Produto removido",
+        valor: 0,
+        foto_principal: null,
+        empresa_id: null
+      };
   }
   
   return pedidoData;
@@ -133,7 +133,7 @@ async function atualizarPedido(id, dados) {
     include: [
       { 
         association: "Produto", 
-        attributes: ["produto_id", "nome", "valor", "foto_principal", "menu"],
+        attributes: ["produto_id", "nome", "valor", "foto_principal", "empresa_id"],
         required: false
       },
       { 

@@ -9,6 +9,28 @@ function PedidoController() {
       if (cliente_id) filtros.cliente_id = cliente_id;
       if (empresa_id) filtros.empresa_id = empresa_id;
       if (status) filtros.status = status;
+      
+      // Lógica de filtragem baseada no role
+      if (req.user) {
+        if (req.user.role === 'empresa') {
+          // Empresa vê apenas seus pedidos
+          filtros.empresa_id = req.user.usuario_id;
+        } else if (req.user.role === 'empresa-funcionario') {
+          // Funcionário vê pedidos da empresa pai
+          const funcionario = await require('../repositories/usuariosRepository').buscarUsuarioPorId(req.user.usuario_id);
+          if (funcionario && funcionario.empresa_pai_id) {
+            filtros.empresa_id = funcionario.empresa_pai_id;
+          } else {
+            // Se não tem empresa_pai_id, retornar vazio
+            return res.json([]);
+          }
+        } else if (req.user.role === 'cliente') {
+          // Cliente vê apenas seus próprios pedidos
+          filtros.cliente_id = req.user.usuario_id;
+        }
+        // Admin vê todos os pedidos - não filtra
+      }
+      
       const itens = await repo.listarPedidos(filtros);
       res.json(itens);
     } catch (error) {
@@ -46,6 +68,16 @@ function PedidoController() {
         empresaIdFinal = req.user.usuario_id;
         if (!cliente_id) {
           return res.status(400).json({ error: 'cliente_id é obrigatório para empresas' });
+        }
+      } else if (req.user.role === 'empresa-funcionario') {
+        // Funcionário: usa empresa_pai_id, cliente_id deve vir do body
+        const funcionario = await require('../repositories/usuariosRepository').buscarUsuarioPorId(req.user.usuario_id);
+        if (!funcionario || !funcionario.empresa_pai_id) {
+          return res.status(403).json({ error: 'Funcionário não vinculado a uma empresa' });
+        }
+        empresaIdFinal = funcionario.empresa_pai_id;
+        if (!cliente_id) {
+          return res.status(400).json({ error: 'cliente_id é obrigatório para funcionários' });
         }
       } else if (req.user.role === 'admin') {
         // Admin: pode especificar ambos ou usar seu próprio ID
