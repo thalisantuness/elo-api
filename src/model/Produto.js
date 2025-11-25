@@ -1,5 +1,6 @@
 const { Sequelize } = require("sequelize");
 const sequelize = require("../utils/db");
+const { Usuario } = require("./Usuarios");
 
 
 const Produto = sequelize.define(
@@ -75,10 +76,8 @@ const Produto = sequelize.define(
   }
 );
 
-// Produto.belongsTo(Estado, {
-//   foreignKey: "estado_id",
-//   as: "estado",
-// });
+// Associação com Empresa (Usuario)
+Produto.belongsTo(Usuario, { foreignKey: "empresa_id", as: "Empresa" });
 
 module.exports = { Produto };
 

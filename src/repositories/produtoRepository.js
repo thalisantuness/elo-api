@@ -1,10 +1,18 @@
 const { Produto } = require('../model/Produto');
 const { Foto } = require('../model/Foto');
+const { Usuario } = require('../model/Usuarios');
 
 async function listarProdutos(filtros = {}) {
   const produtos = await Produto.findAll({
     where: filtros,
-    include: [{ model: Foto, as: 'fotos', attributes: ['photo_id', 'imageData'] }],
+    include: [
+      { model: Foto, as: 'fotos', attributes: ['photo_id', 'imageData'] },
+      { 
+        association: 'Empresa', 
+        attributes: ['usuario_id', 'nome', 'email', 'telefone', 'foto_perfil'],
+        required: false  
+      }
+    ],
     order: [['data_cadastro', 'DESC']]
   });
 
@@ -46,6 +54,13 @@ async function listarProdutos(filtros = {}) {
       tipo_comercializacao: produtoData.tipo_comercializacao,
       tipo_produto: produtoData.tipo_produto,
       empresa_id: produtoData.empresa_id,
+      Empresa: produtoData.Empresa ? {
+        usuario_id: produtoData.Empresa.usuario_id,
+        nome: produtoData.Empresa.nome,
+        email: produtoData.Empresa.email,
+        telefone: produtoData.Empresa.telefone,
+        foto_perfil: produtoData.Empresa.foto_perfil
+      } : null,
       imageData: fotoPrincipalFinal,  // Principal como imageData (compat)
       foto_principal: fotoPrincipalFinal, // Campo explícito para o frontend
       photos: photos,  // Secundárias como photos
@@ -57,7 +72,14 @@ async function listarProdutos(filtros = {}) {
 
 async function buscarProdutoPorId(id) {
   const produto = await Produto.findByPk(id, {
-    include: [{ model: Foto, as: 'fotos', attributes: ['photo_id', 'imageData'] }]
+    include: [
+      { model: Foto, as: 'fotos', attributes: ['photo_id', 'imageData'] },
+      { 
+        association: 'Empresa', 
+        attributes: ['usuario_id', 'nome', 'email', 'telefone', 'foto_perfil'],
+        required: false
+      }
+    ]
   });
 
   if (!produto) return null;
@@ -97,7 +119,14 @@ async function buscarProdutoPorId(id) {
     quantidade: produtoData.quantidade,
     tipo_comercializacao: produtoData.tipo_comercializacao,
     tipo_produto: produtoData.tipo_produto,
-      empresa_id: produtoData.empresa_id,
+    empresa_id: produtoData.empresa_id,
+    Empresa: produtoData.Empresa ? {
+      usuario_id: produtoData.Empresa.usuario_id,
+      nome: produtoData.Empresa.nome,
+      email: produtoData.Empresa.email,
+      telefone: produtoData.Empresa.telefone,
+      foto_perfil: produtoData.Empresa.foto_perfil
+    } : null,
     imageData: fotoPrincipalFinal,  // Principal como imageData (compat)
     foto_principal: fotoPrincipalFinal, // Campo explícito para o frontend
     photos: photos,  // Secundárias como photos
