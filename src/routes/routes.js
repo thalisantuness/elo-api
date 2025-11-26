@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 router.use(express.json());
 const authMiddleware = require("../middleware/auth");
+const optionalAuth = require("../middleware/optionalAuth");
 const chatRepository = require("../repositories/chatRepository");
 const { Usuario } = require("../model/Usuarios");
 
@@ -50,7 +51,10 @@ router.patch("/usuarios/:id/senha", authMiddleware, usuariosController.alterarSe
 router.patch("/usuarios/:id/foto", authMiddleware, usuariosController.atualizarFotoPerfil);
 router.delete("/usuarios/:id", usuariosController.deletar);
 
-router.get("/produtos", produtoController.listar);
+// GET /produtos usa autenticação OPCIONAL:
+// - Sem token ou com role cliente/admin -> marketplace (todos os produtos)
+// - Com role empresa/empresa-funcionario -> filtrado pela empresa correta
+router.get("/produtos", optionalAuth, produtoController.listar);
 router.get("/produtos/:id", produtoController.buscarPorId);
 router.post("/produtos", authMiddleware, produtoController.criar);
 router.put("/produtos/:id", authMiddleware, produtoController.atualizar);
