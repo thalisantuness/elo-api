@@ -89,28 +89,47 @@ function ProdutoController() {
       
       // Lógica de filtragem baseada no role
       if (req.user) {
-        if (req.user.role === 'empresa') {
-          // Empresa vê seus produtos + produtos de todas as empresas filhas (recursivamente)
+        console.log('🔍 [GET /produtos] Usuário autenticado:', {
+          usuario_id: req.user.usuario_id,
+          role: req.user.role
+        });
+
+        // Buscar dados completos do usuário para verificar empresa_pai_id
+        const usuarioCompleto = await usuariosRepo.buscarUsuarioPorId(req.user.usuario_id);
+        console.log('👤 [GET /produtos] Dados completos do usuário:', {
+          usuario_id: usuarioCompleto?.usuario_id,
+          role: usuarioCompleto?.role,
+          empresa_pai_id: usuarioCompleto?.empresa_pai_id,
+          nome: usuarioCompleto?.nome
+        });
+
+        // Se o usuário tem empresa_pai_id, ele é um funcionário (mesmo que role seja "empresa")
+        if (usuarioCompleto && usuarioCompleto.empresa_pai_id) {
+          // Funcionário vê produtos da empresa pai + produtos de todas as empresas filhas
+          const idsEmpresas = await usuariosRepo.buscarIdsEmpresasFilhas(usuarioCompleto.empresa_pai_id);
+          console.log('👔 [GET /produtos] Funcionário - IDs de empresas (pai + filhas):', idsEmpresas);
+          filtros.empresa_id = { [Op.in]: idsEmpresas };
+        } else if (req.user.role === 'empresa') {
+          // Empresa (sem empresa_pai_id) vê seus produtos + produtos de todas as empresas filhas (recursivamente)
           const idsEmpresas = await usuariosRepo.buscarIdsEmpresasFilhas(req.user.usuario_id);
+          console.log('🏢 [GET /produtos] Empresa - IDs de empresas (pai + filhas):', idsEmpresas);
           filtros.empresa_id = { [Op.in]: idsEmpresas };
         } else if (req.user.role === 'empresa-funcionario') {
-          // Funcionário vê produtos da empresa pai + produtos de todas as empresas filhas
-          const funcionario = await usuariosRepo.buscarUsuarioPorId(req.user.usuario_id);
-          if (funcionario && funcionario.empresa_pai_id) {
-            const idsEmpresas = await usuariosRepo.buscarIdsEmpresasFilhas(funcionario.empresa_pai_id);
-            filtros.empresa_id = { [Op.in]: idsEmpresas };
-          } else {
-            // Se não tem empresa_pai_id, retornar vazio
-            return res.json([]);
-          }
+          // Funcionário sem empresa_pai_id (dados inconsistentes) - retornar vazio
+          console.warn('⚠️ [GET /produtos] Funcionário sem empresa_pai_id - retornando array vazio');
+          return res.json([]);
         }
         // Admin e cliente veem todos os produtos (marketplace) - não filtra por empresa_id
+      } else {
+        console.log('🌐 [GET /produtos] Requisição pública (sem autenticação) - retornando todos os produtos');
       }
       
+      console.log('📦 [GET /produtos] Filtros aplicados:', JSON.stringify(filtros, null, 2));
       const produtos = await produtoRepo.listarProdutos(filtros);
+      console.log(`✅ [GET /produtos] Retornando ${produtos.length} produto(s)`);
       res.json(produtos);
     } catch (e) {
-      console.error('Erro ao listar produtos:', e);
+      console.error('❌ [GET /produtos] Erro ao listar produtos:', e);
       res.status(500).json({ error: 'Erro ao listar produtos' });
     }
   }
