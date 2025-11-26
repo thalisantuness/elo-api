@@ -100,10 +100,30 @@ router.post("/conversas", authMiddleware, async (req, res) => {
       });
     }
 
-    // Criar ou recuperar conversa
+    // Normalizar conversa: cliente sempre usuario1, empresa pai sempre usuario2
+    let usuario1_id, usuario2_id;
+    
+    if (req.user.role === 'cliente') {
+      // Cliente iniciando conversa: normalizar para empresa pai
+      const normalizada = await chatRepository.normalizarConversa(usuario_id, destinatario_id);
+      usuario1_id = normalizada.usuario1_id;
+      usuario2_id = normalizada.usuario2_id;
+    } else if (req.user.role === 'empresa' || req.user.role === 'empresa-funcionario') {
+      // Empresa/funcionário iniciando conversa: normalizar para empresa pai como usuario2
+      const empresaPaiId = await chatRepository.buscarEmpresaPaiId(usuario_id);
+      if (!empresaPaiId) {
+        return res.status(400).json({ error: "Empresa não encontrada" });
+      }
+      usuario1_id = destinatario_id; // Cliente sempre usuario1
+      usuario2_id = empresaPaiId; // Empresa pai sempre usuario2
+    } else {
+      return res.status(403).json({ error: "Apenas clientes, empresas e funcionários podem criar conversas" });
+    }
+
+    // Criar ou recuperar conversa normalizada
     const conversa = await chatRepository.criarConversaSeNaoExistir(
-      usuario_id,
-      destinatario_id
+      usuario1_id,
+      usuario2_id
     );
 
     // Buscar detalhes dos participantes
