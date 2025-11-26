@@ -3,7 +3,9 @@ const { v4: uuidv4 } = require("uuid");
 const sharp = require("sharp");
 const bcrypt = require("bcrypt");
 const { Usuario } = require("../model/Usuarios");
+const { Pedido } = require("../model/Pedido");
 const sequelize = require("../utils/db");
+const { Op } = require("sequelize");
 
 // Helper para deletar um arquivo do S3 a partir da URL (igual produtos)
 async function deleteFromS3(fileUrl) {
@@ -240,6 +242,43 @@ async function buscarIdsEmpresasFilhas(empresaPaiId, visitados = new Set()) {
   return [...new Set(idsEmpresas)];
 }
 
+/**
+ * Busca clientes que têm pedidos com uma empresa (ou suas empresas filhas)
+ * Regra: Se o cliente fez um pedido com a empresa, ele já pode ser listado como cliente daquela empresa
+ * @param {number} empresaId - ID da empresa pai
+ * @returns {Promise<Usuario[]>} Array com os clientes que têm pedidos com essa empresa
+ */
+async function buscarClientesPorPedidos(empresaId) {
+  // Buscar IDs de todas as empresas (pai + filhas)
+  const idsEmpresas = await buscarIdsEmpresasFilhas(empresaId);
+  
+  // Buscar pedidos com essas empresas e extrair os IDs únicos dos clientes usando DISTINCT
+  const pedidos = await Pedido.findAll({
+    where: {
+      empresa_id: { [Op.in]: idsEmpresas }
+    },
+    attributes: [[sequelize.fn('DISTINCT', sequelize.col('cliente_id')), 'cliente_id']],
+    raw: true
+  });
+  
+  const idsClientes = pedidos.map(p => p.cliente_id).filter(id => id !== null);
+  
+  // Se não houver clientes, retornar array vazio
+  if (idsClientes.length === 0) {
+    return [];
+  }
+  
+  // Buscar os clientes
+  const clientes = await Usuario.findAll({
+    where: {
+      usuario_id: { [Op.in]: idsClientes },
+      role: 'cliente'
+    }
+  });
+  
+  return clientes;
+}
+
 module.exports = {
   criarUsuario,
   buscarUsuarioPorId,
@@ -251,4 +290,5 @@ module.exports = {
   atualizarFotoPerfil,
   listarUsuarios,
   buscarIdsEmpresasFilhas,
+  buscarClientesPorPedidos,
 };

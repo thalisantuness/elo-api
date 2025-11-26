@@ -152,25 +152,57 @@ function UsuarioController() {
           break;
           
         case 'empresa':
-          // Empresa vê seus funcionários, clientes e empresas filhas vinculadas
-          whereClause[Op.or] = [
+          // Empresa vê:
+          // 1. Seus funcionários (empresa-funcionario com empresa_pai_id = empresa)
+          // 2. Empresas filhas (empresa com empresa_pai_id = empresa)
+          // 3. Clientes que têm pedidos com ela (baseado em pedidos, não empresa_pai_id)
+          const funcionariosEEmpresasFilhas = [
             { role: 'empresa-funcionario', empresa_pai_id: req.user.usuario_id },
-            { role: 'cliente', empresa_pai_id: req.user.usuario_id },
-            { role: 'empresa', empresa_pai_id: req.user.usuario_id } // Empresas filhas
+            { role: 'empresa', empresa_pai_id: req.user.usuario_id }
           ];
-          console.log('🏢 Empresa logada - mostrando funcionários, clientes e empresas filhas vinculadas');
+          
+          // Buscar clientes que têm pedidos com essa empresa
+          const clientesComPedidos = await usuariosRepository.buscarClientesPorPedidos(req.user.usuario_id);
+          const idsClientesComPedidos = clientesComPedidos.map(c => c.usuario_id);
+          
+          if (idsClientesComPedidos.length > 0) {
+            whereClause[Op.or] = [
+              ...funcionariosEEmpresasFilhas,
+              { role: 'cliente', usuario_id: { [Op.in]: idsClientesComPedidos } }
+            ];
+          } else {
+            whereClause[Op.or] = funcionariosEEmpresasFilhas;
+          }
+          
+          console.log('🏢 Empresa logada - mostrando funcionários, empresas filhas e clientes com pedidos');
           break;
           
         case 'empresa-funcionario':
-          // Funcionário vê os mesmos dados da empresa pai (funcionários, clientes e empresas filhas)
+          // Funcionário vê os mesmos dados da empresa pai:
+          // 1. Funcionários da empresa pai
+          // 2. Empresas filhas da empresa pai
+          // 3. Clientes que têm pedidos com a empresa pai (baseado em pedidos, não empresa_pai_id)
           const funcionario = await usuariosRepository.buscarUsuarioPorId(req.user.usuario_id);
           if (funcionario && funcionario.empresa_pai_id) {
-            whereClause[Op.or] = [
+            const funcionariosEEmpresasFilhas = [
               { role: 'empresa-funcionario', empresa_pai_id: funcionario.empresa_pai_id },
-              { role: 'cliente', empresa_pai_id: funcionario.empresa_pai_id },
-              { role: 'empresa', empresa_pai_id: funcionario.empresa_pai_id } // Empresas filhas
+              { role: 'empresa', empresa_pai_id: funcionario.empresa_pai_id }
             ];
-            console.log('👔 Funcionário logado - mostrando funcionários, clientes e empresas filhas da empresa pai');
+            
+            // Buscar clientes que têm pedidos com a empresa pai
+            const clientesComPedidos = await usuariosRepository.buscarClientesPorPedidos(funcionario.empresa_pai_id);
+            const idsClientesComPedidos = clientesComPedidos.map(c => c.usuario_id);
+            
+            if (idsClientesComPedidos.length > 0) {
+              whereClause[Op.or] = [
+                ...funcionariosEEmpresasFilhas,
+                { role: 'cliente', usuario_id: { [Op.in]: idsClientesComPedidos } }
+              ];
+            } else {
+              whereClause[Op.or] = funcionariosEEmpresasFilhas;
+            }
+            
+            console.log('👔 Funcionário logado - mostrando funcionários, empresas filhas e clientes com pedidos da empresa pai');
           } else {
             // Se não tem empresa_pai_id, não mostra nada
             whereClause.usuario_id = { [Op.eq]: -1 }; // ID inexistente
