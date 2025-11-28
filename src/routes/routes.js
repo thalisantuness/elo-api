@@ -40,6 +40,8 @@ const ProdutoController = require("../controllers/produtoController");
 const produtoController = ProdutoController();
 const PedidoController = require("../controllers/pedidoController");
 const pedidoController = PedidoController();
+const FaturamentoController = require("../controllers/faturamentoController");
+const faturamentoController = FaturamentoController();
 
 router.post("/cadastrar", usuariosController.cadastrar);
 router.post("/login", usuariosController.logar);
@@ -69,6 +71,9 @@ router.get("/pedidos/:id", authMiddleware, pedidoController.buscarPorId);
 router.put("/pedidos/:id", authMiddleware, pedidoController.atualizar);
 router.put("/pedidos/:id/cancelar", authMiddleware, pedidoController.cancelar);
 router.delete("/pedidos/:id", authMiddleware, pedidoController.excluir);
+
+// Gráfico de Faturamentos
+router.get("/grafico-faturamentos", authMiddleware, faturamentoController.getGraficoFaturamentos);
 
 // Rotas de Chat
 router.get("/conversas", authMiddleware, chatController.listarConversas);
