@@ -1,6 +1,6 @@
 const { Sequelize } = require("sequelize");
 const sequelize = require("../utils/db");
-const { Regra } = require("./Regra");
+// const { Regra } = require("./Regra");
 
 const Usuario = sequelize.define(
   "Usuario",
@@ -10,14 +10,14 @@ const Usuario = sequelize.define(
       primaryKey: true,
       autoIncrement: true,
     },
-    //     empresa_pai_id: {
-    //   type: Sequelize.INTEGER,
-    //   allowNull: true,
-    //   references: {
-    //     model: "usuarios",
-    //     key: "usuario_id",
-    //   },
-    // },
+        empresa_pai_id: {
+      type: Sequelize.INTEGER,
+      allowNull: true,
+      references: {
+        model: "usuarios",
+        key: "usuario_id",
+      },
+    },
     role: {
       type: Sequelize.STRING,
       allowNull: false,

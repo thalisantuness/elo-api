@@ -1,5 +1,5 @@
 const { Sequelize } = require('sequelize');
-// const { Usuario } = require('./Usuarios'); 
+const { Usuario } = require('./Usuarios'); 
 // const { Recompensas } = require('./Recompensas');
 const sequelize = require('../utils/db');
 
@@ -9,16 +9,16 @@ const SolicitacaoRecompensa = sequelize.define('SolicitacaoRecompensa', {
     primaryKey: true,
     autoIncrement: true,
   },
-//   usuario_id: {
-//     type: Sequelize.INTEGER,
-//     allowNull: false,
-//     references: {
-//       model: Usuario,
-//       key: 'usuario_id',
-//     },
-//     onUpdate: 'CASCADE',
-//     onDelete: 'CASCADE',
-//   },
+  usuario_id: {
+    type: Sequelize.INTEGER,
+    allowNull: false,
+    references: {
+      model: Usuario,
+      key: 'usuario_id',
+    },
+    onUpdate: 'CASCADE',
+    onDelete: 'CASCADE',
+  },
 //   recom_id: {
 //     type: Sequelize.INTEGER,
 //     allowNull: false,
@@ -48,10 +48,10 @@ const SolicitacaoRecompensa = sequelize.define('SolicitacaoRecompensa', {
   timestamps: false,
 });
 
-// SolicitacaoRecompensa.belongsTo(Usuario, {
-//   foreignKey: 'usuario_id',
-//   as: 'usuario', 
-// });
+SolicitacaoRecompensa.belongsTo(Usuario, {
+  foreignKey: 'usuario_id',
+  as: 'usuario', 
+});
 
 // SolicitacaoRecompensa.belongsTo(Recompensas, {
 //   foreignKey: 'recom_id',

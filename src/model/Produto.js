@@ -10,14 +10,14 @@ const Produto = sequelize.define(
       primaryKey: true,
       autoIncrement: true,
     },
-    //     empresa_id: {
-    //   type: Sequelize.INTEGER,
-    //   allowNull: false,
-    //   references: {
-    //     model: "usuarios",
-    //     key: "usuario_id",
-    //   },
-    // },
+        empresa_id: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      references: {
+        model: "usuarios",
+        key: "usuario_id",
+      },
+    },
     nome: {
       type: Sequelize.STRING,
       allowNull: false,
@@ -68,6 +68,6 @@ const Produto = sequelize.define(
   }
 );
 
-// Produto.belongsTo(Usuario, { foreignKey: "empresa_id", as: "Empresa" });
+Produto.belongsTo(Usuario, { foreignKey: "empresa_id", as: "Empresa" });
 
 module.exports = { Produto };

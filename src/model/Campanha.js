@@ -8,11 +8,11 @@ const Campanha = sequelize.define('campanhas', {
     primaryKey: true,
     autoIncrement: true,
   },
-//   empresa_id: {
-//     type: Sequelize.INTEGER,
-//     allowNull: false,
-//     references: { model: 'usuarios', key: 'usuario_id' },
-//   },
+  empresa_id: {
+    type: Sequelize.INTEGER,
+    allowNull: false,
+    references: { model: 'usuarios', key: 'usuario_id' },
+  },
   titulo: {
     type: Sequelize.STRING(100),
     allowNull: false,
@@ -55,10 +55,10 @@ const Campanha = sequelize.define('campanhas', {
   schema: 'public',
   tableName: 'campanhas',
   timestamps: false,
-//   indexes: [
-//     { fields: ['empresa_id'] },
-//     { fields: ['ativa', 'data_inicio', 'data_fim'] },
-//   ]
+  indexes: [
+    { fields: ['empresa_id'] },
+    { fields: ['ativa', 'data_inicio', 'data_fim'] },
+  ]
 });
 
 Campanha.belongsTo(Usuario, { foreignKey: 'empresa_id', as: 'empresa' });
