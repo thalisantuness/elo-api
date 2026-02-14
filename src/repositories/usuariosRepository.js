@@ -3,24 +3,115 @@ const { Regra } = require('../model/Regra');
 const bcrypt = require('bcrypt');
 const { Op } = require('sequelize');
 const sequelize = require("../utils/db");
+const s3 = require("../utils/awsConfig");
+const { v4: uuidv4 } = require("uuid");
+const sharp = require("sharp");
 
-// Funções do repositório antigo (para compatibilidade)
+// ==================== FUNÇÕES DE UPLOAD (ADAPTADAS DO SEU OUTRO APP) ====================
+
+async function deleteFromS3(fileUrl) {
+  if (!fileUrl || !fileUrl.includes(process.env.AWS_BUCKET_NAME)) {
+    console.log("URL inválida ou não pertence ao bucket. Nenhuma ação de exclusão tomada.");
+    return;
+  }
+  try {
+    const key = fileUrl.split('.com/')[1];
+    await s3.deleteObject({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: key,
+    }).promise();
+    console.log(`Arquivo deletado do S3: ${key}`);
+  } catch (error) {
+    console.error("Erro ao deletar arquivo do S3:", error);
+  }
+}
+
+// Helper para fazer upload de uma nova imagem para o S3
+async function uploadToS3(base64Image, folder) {
+  if (!base64Image || !base64Image.startsWith('data:image')) {
+    throw new Error('Formato de imagem Base64 inválido');
+  }
+  try {
+    const buffer = Buffer.from(base64Image.split(',')[1], 'base64');
+    const compressedBuffer = await sharp(buffer)
+      .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+
+    const key = `${folder}/${uuidv4()}.jpg`;
+    const uploadResult = await s3.upload({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: key,
+      Body: compressedBuffer,
+      ContentType: 'image/jpeg',
+      ACL: 'public-read'
+    }).promise();
+
+    console.log(`Upload realizado com sucesso: ${uploadResult.Location}`);
+    return uploadResult.Location;
+  } catch (error) {
+    console.error('Erro ao fazer upload para o S3:', error);
+    throw new Error('Falha no upload da imagem');
+  }
+}
+
+// ==================== FUNÇÕES DE USUÁRIO ====================
+
 async function criarUsuario(dados) {
   const { usuario, fotoPerfilBase64 } = dados;
   const senhaHash = await bcrypt.hash(usuario.senha, 10);
   
   return sequelize.transaction(async (t) => {
     let foto_perfil = null;
-    // Lógica de upload S3 pode ser adicionada depois
+    
+    // FAZER UPLOAD DA FOTO SE FORNECIDA (igual ao seu outro app)
+    if (fotoPerfilBase64 && fotoPerfilBase64.startsWith('data:image')) {
+      try {
+        foto_perfil = await uploadToS3(fotoPerfilBase64, 'usuarios/perfil');
+        console.log('Foto de perfil enviada para S3:', foto_perfil);
+      } catch (uploadError) {
+        console.error('Erro no upload da foto:', uploadError);
+        throw new Error(`Erro ao processar foto de perfil: ${uploadError.message}`);
+      }
+    }
+    
     const usuarioCriado = await Usuario.create({
       ...usuario,
       senha: senhaHash,
-      foto_perfil
+      foto_perfil // AGORA VAI SALVAR A URL DO S3
     }, { transaction: t });
+
     return usuarioCriado;
   });
 }
 
+// Função para atualizar apenas a foto de perfil (adaptada do seu outro app)
+async function atualizarFotoPerfil(usuarioId, imageBase64) {
+  return sequelize.transaction(async (t) => {
+    const usuario = await Usuario.findByPk(usuarioId, { transaction: t });
+    if (!usuario) {
+      throw new Error('Usuário não encontrado');
+    }
+
+    // Deletar foto antiga do S3 se existir
+    const oldFileUrl = usuario.foto_perfil;
+    if (oldFileUrl && oldFileUrl.includes(process.env.AWS_BUCKET_NAME)) {
+      await deleteFromS3(oldFileUrl);
+    }
+
+    // Upload da nova foto
+    const newFileUrl = await uploadToS3(imageBase64, 'usuarios/perfil');
+
+    usuario.foto_perfil = newFileUrl;
+    await usuario.save({ transaction: t });
+
+    const usuarioAtualizado = usuario.toJSON();
+    delete usuarioAtualizado.senha;
+    return usuarioAtualizado;
+  });
+}
+
+// Outras funções existentes...
 async function buscarUsuarioPorId(id) {
   return Usuario.findByPk(id, {
     include: [{
@@ -50,6 +141,11 @@ async function atualizarUsuario(id, dados) {
 }
 
 async function deletarUsuario(id) {
+  // Antes de deletar, remover foto do S3 se existir
+  const usuario = await Usuario.findByPk(id);
+  if (usuario && usuario.foto_perfil && usuario.foto_perfil.includes(process.env.AWS_BUCKET_NAME)) {
+    await deleteFromS3(usuario.foto_perfil);
+  }
   return Usuario.destroy({ where: { usuario_id: id } });
 }
 
@@ -229,6 +325,7 @@ module.exports = {
   deletarUsuario,
   atualizarPerfil,
   buscarUsuarioPorIdComSenha,
+  atualizarFotoPerfil, // AGORA ESTÁ FUNCIONAL
   listarUsuarios,
   buscarIdsEmpresasFilhas,
   // Funções novas
