@@ -1,12 +1,39 @@
 const express = require("express");
 const router = express.Router();
-router.use(express.json());
+router.use(express.json({ limit: '10mb' })); // Aumentado limite para upload de fotos
+
 const authMiddleware = require("../middleware/auth");
 const optionalAuth = require("../middleware/optionalAuth");
 const chatRepository = require("../repositories/chatRepository");
 const { Usuario } = require("../model/Usuarios");
 
-// Função para validar permissões de conversa
+// ==================== IMPORTS DOS CONTROLLERS ====================
+
+// Controllers existentes
+const UsuarioController = require("../controllers/usuariosController");
+const usuariosController = UsuarioController();
+
+const ChatController = require("../controllers/chatController");
+const chatController = ChatController();
+
+const ProdutoController = require("../controllers/produtoController");
+const produtoController = ProdutoController();
+
+// Novos controllers do sistema de pontos e recompensas
+const RecompensasController = require('../controllers/recompensasController');
+const recompensasController = RecompensasController();
+
+const SolicitacoesController = require("../controllers/solicitacoesController");
+const solicitacoesController = SolicitacoesController();
+
+const RegrasController = require('../controllers/regrasController');
+const regrasController = RegrasController();
+
+const CampanhasController = require('../controllers/campanhasController');
+const campanhasController = CampanhasController();
+
+// ==================== FUNÇÃO AUXILIAR PARA CHAT ====================
+
 function validarPermissaoConversa(roleRemetente, roleDestinatario) {
   // Admin pode conversar com qualquer um
   if (roleRemetente === 'admin') {
@@ -28,41 +55,65 @@ function validarPermissaoConversa(roleRemetente, roleDestinatario) {
     return true;
   }
   
-  // Outros casos não são permitidos
   return false;
 }
 
-const UsuarioController = require("../controllers/usuariosController");
-const usuariosController = UsuarioController();
-const ChatController = require("../controllers/chatController");
-const chatController = ChatController();
-const ProdutoController = require("../controllers/produtoController");
-const produtoController = ProdutoController();
+// ==================== ROTAS PÚBLICAS ====================
 
+// Autenticação
 router.post("/cadastrar", usuariosController.cadastrar);
 router.post("/login", usuariosController.logar);
-router.get("/usuarios", authMiddleware, usuariosController.listar);
-router.get("/usuarios/:id", usuariosController.buscarPorId);
-router.put("/usuarios/:id", usuariosController.atualizar);
-router.patch("/usuarios/:id/perfil", authMiddleware, usuariosController.atualizarPerfil);
-router.patch("/usuarios/:id/senha", authMiddleware, usuariosController.alterarSenha);
-router.patch("/usuarios/:id/foto", authMiddleware, usuariosController.atualizarFotoPerfil);
-router.delete("/usuarios/:id", usuariosController.deletar);
 
+// Usuários (público - apenas busca por ID)
+router.get("/usuarios/:id", usuariosController.buscarPorId);
+
+// Produtos (público - listagem e busca)
 router.get("/produtos", optionalAuth, produtoController.listar);
 router.get("/produtos/:id", produtoController.buscarPorId);
-router.post("/produtos", authMiddleware, produtoController.criar);
-router.put("/produtos/:id", authMiddleware, produtoController.atualizar);
-router.delete("/produtos/:id/fotos/:fotoId", authMiddleware, produtoController.deletarFoto);
+
+// ==================== ROTAS AUTENTICADAS ====================
+// Todas as rotas abaixo requerem autenticação
+router.use(authMiddleware);
+
+// ==================== ROTAS DE USUÁRIOS ====================
+
+// Listagem de usuários (com filtros por role)
+router.get("/usuarios", usuariosController.listar);
+
+// Atualizações de perfil
+router.put("/usuarios/:id", usuariosController.atualizar);
+router.patch("/usuarios/:id/perfil", usuariosController.atualizarPerfil);
+router.patch("/usuarios/:id/senha", usuariosController.alterarSenha);
+router.patch("/usuarios/:id/foto", usuariosController.atualizarFotoPerfil);
+
+// Exclusão de usuário
+router.delete("/usuarios/:id", usuariosController.deletar);
+
+// Rotas administrativas de usuários
+router.get("/visualizar-usuarios", usuariosController.visualizarUsuario);
+router.put("/usuarios/admin", usuariosController.tornarAdmin);
+router.put("/usuarios/empresa", usuariosController.tornarEmpresa);
+router.put("/usuarios/empresa/:id/aprovar", usuariosController.aprovarEmpresa);
+router.get("/empresas", usuariosController.listarEmpresas);
+router.put("/minha-empresa", usuariosController.atualizarDadosEmpresa);
+router.put("/usuarios/pontos/:id", usuariosController.givePoints);
+
+// ==================== ROTAS DE PRODUTOS ====================
+
+router.post("/produtos", produtoController.criar);
+router.put("/produtos/:id", produtoController.atualizar);
 router.delete("/produtos/:id", produtoController.deletar);
-router.post("/produtos/:id/fotos", authMiddleware, produtoController.adicionarFoto);
+router.post("/produtos/:id/fotos", produtoController.adicionarFoto);
+router.delete("/produtos/:id/fotos/:fotoId", produtoController.deletarFoto);
 
-// Rotas de Chat
-router.get("/conversas", authMiddleware, chatController.listarConversas);
-router.get("/conversas/:conversa_id/mensagens", authMiddleware, chatController.listarMensagens);
-router.put("/mensagens/:mensagem_id/lida", authMiddleware, chatController.marcarComoLida);
+// ==================== ROTAS DE CHAT ====================
 
-router.post("/conversas", authMiddleware, async (req, res) => {
+router.get("/conversas", chatController.listarConversas);
+router.get("/conversas/:conversa_id/mensagens", chatController.listarMensagens);
+router.put("/mensagens/:mensagem_id/lida", chatController.marcarComoLida);
+
+// Rota para criar nova conversa
+router.post("/conversas", async (req, res) => {
   try {
     const { destinatario_id } = req.body;
     const usuario_id = req.user.usuario_id;
@@ -73,13 +124,11 @@ router.post("/conversas", authMiddleware, async (req, res) => {
       });
     }
 
-    // Validar destinatário
     const destinatario = await Usuario.findByPk(destinatario_id);
     if (!destinatario) {
       return res.status(404).json({ error: "Destinatário não encontrado" });
     }
 
-    // Validar permissões de conversa
     const podeConversar = validarPermissaoConversa(req.user.role, destinatario.role);
     if (!podeConversar) {
       return res.status(400).json({
@@ -87,33 +136,28 @@ router.post("/conversas", authMiddleware, async (req, res) => {
       });
     }
 
-    // Normalizar conversa: cliente sempre usuario1, empresa pai sempre usuario2
     let usuario1_id, usuario2_id;
     
     if (req.user.role === 'cliente') {
-      // Cliente iniciando conversa: normalizar para empresa pai
       const normalizada = await chatRepository.normalizarConversa(usuario_id, destinatario_id);
       usuario1_id = normalizada.usuario1_id;
       usuario2_id = normalizada.usuario2_id;
     } else if (req.user.role === 'empresa' || req.user.role === 'empresa-funcionario') {
-      // Empresa/funcionário iniciando conversa: normalizar para empresa pai como usuario2
       const empresaPaiId = await chatRepository.buscarEmpresaPaiId(usuario_id);
       if (!empresaPaiId) {
         return res.status(400).json({ error: "Empresa não encontrada" });
       }
-      usuario1_id = destinatario_id; // Cliente sempre usuario1
-      usuario2_id = empresaPaiId; // Empresa pai sempre usuario2
+      usuario1_id = destinatario_id;
+      usuario2_id = empresaPaiId;
     } else {
       return res.status(403).json({ error: "Apenas clientes, empresas e funcionários podem criar conversas" });
     }
 
-    // Criar ou recuperar conversa normalizada
     const conversa = await chatRepository.criarConversaSeNaoExistir(
       usuario1_id,
       usuario2_id
     );
 
-    // Buscar detalhes dos participantes
     const usuario1 = await Usuario.findByPk(conversa.usuario1_id, {
       attributes: ["usuario_id", "nome", "email", "role", "foto_perfil"],
     });
@@ -136,6 +180,40 @@ router.post("/conversas", authMiddleware, async (req, res) => {
     console.error("Erro ao criar conversa:", error);
     res.status(400).json({ error: error.message });
   }
+});
+
+// ==================== ROTAS DE RECOMPENSAS ====================
+
+router.post('/recompensas', recompensasController.cadastrarRecompensas);
+router.get('/recompensas', recompensasController.visualizarRecompensas);
+router.put('/recompensas/:recom_id', recompensasController.atualizarRecompensas);
+router.delete('/recompensas/:recom_id', recompensasController.excluirRecom);
+
+// ==================== ROTAS DE SOLICITAÇÕES ====================
+
+router.get('/solicitacoes', solicitacoesController.listarSolicitacoes);
+router.post('/solicitacoes', solicitacoesController.criarSolicitacao);
+router.put('/solicitacoes/processar/:id', solicitacoesController.processarSolicitacao);
+
+// ==================== ROTAS DE REGRAS ====================
+
+router.post('/regras', regrasController.criarRegra);
+router.get('/minhas-regras', regrasController.listarRegrasEmpresa);
+router.get('/empresas/:empresa_id/regras', regrasController.listarRegrasPorEmpresaId);
+router.post('/regras-padrao', regrasController.criarRegrasPadrao);
+
+// ==================== ROTAS DE CAMPANHAS ====================
+
+router.post('/campanhas', campanhasController.criar);
+router.get('/campanhas', campanhasController.listar);
+router.get('/campanhas/:id', campanhasController.buscarPorId);
+router.put('/campanhas/:id', campanhasController.atualizar);
+router.delete('/campanhas/:id', campanhasController.excluir);
+
+// ==================== ROTA 404 ====================
+
+router.use('*', (req, res) => {
+  res.status(404).json({ error: 'Rota não encontrada' });
 });
 
 module.exports = router;

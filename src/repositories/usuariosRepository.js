@@ -1,154 +1,56 @@
-const s3 = require("../utils/awsConfig");
-const { v4: uuidv4 } = require("uuid");
-const sharp = require("sharp");
-const bcrypt = require("bcrypt");
-const { Usuario } = require("../model/Usuarios");
+const { Usuario } = require('../model/Usuarios');
+const { Regra } = require('../model/Regra');
+const bcrypt = require('bcrypt');
+const { Op } = require('sequelize');
 const sequelize = require("../utils/db");
-const { Op } = require("sequelize");
 
-// Helper para deletar um arquivo do S3 a partir da URL
-async function deleteFromS3(fileUrl) {
-  if (!fileUrl || !fileUrl.includes(process.env.AWS_BUCKET_NAME)) {
-    console.log("URL inválida ou não pertence ao bucket.");
-    return;
-  }
-  try {
-    const key = fileUrl.split('.com/')[1];
-    await s3.deleteObject({
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: key,
-    }).promise();
-    console.log(`Arquivo deletado do S3: ${key}`);
-  } catch (error) {
-    console.error("Erro ao deletar arquivo do S3:", error);
-  }
-}
-
-// Validação de base64
-function validateBase64Image(base64String) {
-  if (!base64String || typeof base64String !== 'string') {
-    throw new Error('String base64 inválida');
-  }
-
-  if (!base64String.startsWith('data:image/')) {
-    throw new Error('String não é uma imagem base64 válida');
-  }
-
-  const parts = base64String.split(',');
-  if (parts.length !== 2) {
-    throw new Error('Formato base64 inválido');
-  }
-
-  const base64Data = parts[1];
-  if (!base64Data || base64Data.length < 100) {
-    throw new Error('Dados de imagem base64 muito pequenos ou vazios');
-  }
-
-  const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
-  if (!base64Regex.test(base64Data)) {
-    throw new Error('Dados base64 contêm caracteres inválidos');
-  }
-
-  return base64Data;
-}
-
-// Compress imagem
-async function compressImage(buffer) {
-  try {
-    if (!buffer || buffer.length === 0) {
-      throw new Error('Buffer de imagem vazio');
-    }
-
-    const metadata = await sharp(buffer).metadata();
-    console.log('Metadata da imagem:', metadata);
-    
-    if (!metadata.format) {
-      throw new Error('Formato de imagem não suportado');
-    }
-    
-    return await sharp(buffer)
-      .resize(800, 800, { 
-        fit: 'inside',
-        withoutEnlargement: true 
-      })
-      .jpeg({ quality: 80 })
-      .toBuffer();
-  } catch (error) {
-    console.error('Erro ao comprimir imagem:', error.message);
-    console.error('Tamanho do buffer:', buffer ? buffer.length : 'undefined');
-    throw new Error(`Erro ao processar imagem: ${error.message}`);
-  }
-}
-
-// Upload pro S3
-async function uploadToS3(base64Image, folder) {
-  try {
-    const base64Data = validateBase64Image(base64Image);
-    console.log('Processando foto, tamanho base64:', base64Data.length);
-    
-    const buffer = Buffer.from(base64Data, 'base64');
-    console.log('Buffer criado, tamanho:', buffer.length);
-    
-    const compressed = await compressImage(buffer);
-    console.log('Imagem comprimida, tamanho:', compressed.length);
-    
-    const key = `${folder}/${uuidv4()}.jpg`;
-    const result = await s3.upload({ 
-      Bucket: process.env.AWS_BUCKET_NAME, 
-      Key: key, 
-      Body: compressed,
-      ContentType: 'image/jpeg',
-      ACL: 'public-read'
-    }).promise();
-    
-    console.log(`Upload realizado com sucesso: ${result.Location}`);
-    return result.Location;
-  } catch (error) {
-    console.error('Erro no upload para S3:', error.message);
-    throw error;
-  }
-}
-
+// Funções do repositório antigo (para compatibilidade)
 async function criarUsuario(dados) {
   const { usuario, fotoPerfilBase64 } = dados;
-
   const senhaHash = await bcrypt.hash(usuario.senha, 10);
-
+  
   return sequelize.transaction(async (t) => {
     let foto_perfil = null;
-
-    if (fotoPerfilBase64) {
-      foto_perfil = await uploadToS3(fotoPerfilBase64, 'usuarios/perfil');
-    }
-
+    // Lógica de upload S3 pode ser adicionada depois
     const usuarioCriado = await Usuario.create({
       ...usuario,
       senha: senhaHash,
       foto_perfil
     }, { transaction: t });
-
     return usuarioCriado;
   });
 }
 
 async function buscarUsuarioPorId(id) {
-  const usuario = await Usuario.findByPk(id);
-  return usuario;
+  return Usuario.findByPk(id, {
+    include: [{
+      model: Regra,
+      as: 'regra',
+      required: false
+    }]
+  });
 }
 
 async function buscarUsuarioPorEmail(email) {
-  return await Usuario.findOne({ where: { email } });
+  return Usuario.findOne({ 
+    where: { email },
+    include: [{
+      model: Regra,
+      as: 'regra',
+      required: false
+    }]
+  });
 }
 
 async function atualizarUsuario(id, dados) {
-  return await Usuario.update(dados, {
+  return Usuario.update(dados, {
     where: { usuario_id: id },
     returning: true,
   });
 }
 
 async function deletarUsuario(id) {
-  return await Usuario.destroy({ where: { usuario_id: id } });
+  return Usuario.destroy({ where: { usuario_id: id } });
 }
 
 async function atualizarPerfil(id, dadosPerfil) {
@@ -157,54 +59,29 @@ async function atualizarPerfil(id, dadosPerfil) {
     returning: true,
   });
   if (updatedRows > 0) {
-    const usuario = await Usuario.findByPk(id);
-    return usuario;
+    return Usuario.findByPk(id);
   }
   return null;
 }
 
 async function buscarUsuarioPorIdComSenha(id) {
-  const usuario = await Usuario.findOne({
+  return Usuario.findOne({
     where: { usuario_id: id },
     attributes: { include: ['senha'] }
-  });
-  return usuario;
-}
-
-async function atualizarFotoPerfil(usuarioId, imageBase64) {
-  return sequelize.transaction(async (t) => {
-    const usuario = await Usuario.findByPk(usuarioId, { transaction: t });
-    if (!usuario) {
-      throw new Error('Usuário não encontrado');
-    }
-
-    const oldFileUrl = usuario.foto_perfil;
-    if (oldFileUrl && oldFileUrl.includes(process.env.AWS_BUCKET_NAME)) {
-      await deleteFromS3(oldFileUrl);
-    }
-
-    const newFileUrl = await uploadToS3(imageBase64, 'usuarios/perfil');
-
-    usuario.foto_perfil = newFileUrl;
-    await usuario.save({ transaction: t });
-
-    const usuarioAtualizado = usuario.toJSON();
-    delete usuarioAtualizado.senha;
-    return usuarioAtualizado;
   });
 }
 
 async function listarUsuarios(filtros = {}) {
-  const usuarios = await Usuario.findAll({ where: filtros });
-  return usuarios;
+  return Usuario.findAll({ 
+    where: filtros,
+    include: [{
+      model: Regra,
+      as: 'regra',
+      required: false
+    }]
+  });
 }
 
-/**
- * Busca todos os IDs de empresas filhas (incluindo recursivamente)
- * @param {number} empresaPaiId - ID da empresa pai
- * @param {Set<number>} visitados - IDs já visitados (para evitar loops infinitos)
- * @returns {Promise<number[]>} Array com IDs da empresa pai + todas as empresas filhas
- */
 async function buscarIdsEmpresasFilhas(empresaPaiId, visitados = new Set()) {
   if (visitados.has(empresaPaiId)) {
     return [];
@@ -229,7 +106,122 @@ async function buscarIdsEmpresasFilhas(empresaPaiId, visitados = new Set()) {
   return [...new Set(idsEmpresas)];
 }
 
+// Funções do novo repositório
+async function listarEmpresas(whereClause = {}) {
+  const defaultWhere = {
+    role: 'empresa',
+    status: 'ativo',
+    ...whereClause
+  };
+  return Usuario.findAll({
+    where: defaultWhere,
+    include: [{
+      model: Regra,
+      as: 'regra',
+      required: false,
+      attributes: ['regra_id', 'nome', 'tipo', 'pontos', 'multiplicador']
+    }],
+    order: [['data_cadastro', 'DESC']]
+  }).then(empresas => empresas.map(e => {
+    if (e.regra) {
+      const regra = e.regra;
+      e.dataValues.descricao_regra = regra.tipo === 'por_compra' 
+        ? `${regra.pontos} pontos por compra` 
+        : `${regra.multiplicador} pontos por real gasto`;
+    }
+    return e;
+  }));
+}
+
+async function tornarUsuarioAdmin(id) {
+  const usuarioExistente = await Usuario.findByPk(id);
+  if (!usuarioExistente) {
+    throw new Error('Usuário não existe');
+  }
+  await Usuario.update({ role: 'admin' }, { where: { usuario_id: id } });
+  return Usuario.findByPk(id);
+}
+
+async function tornarUsuarioEmpresa(id) {
+  const usuarioExistente = await Usuario.findByPk(id);
+  if (!usuarioExistente) {
+    throw new Error('Usuário não existe');
+  }
+  await Usuario.update({ role: 'empresa', status: 'pendente' }, { where: { usuario_id: id } });
+  return Usuario.findByPk(id);
+}
+
+async function aprovarEmpresa(id) {
+  const usuarioExistente = await Usuario.findByPk(id);
+  if (!usuarioExistente) {
+    throw new Error('Empresa não existe');
+  }
+  if (usuarioExistente.role !== 'empresa') {
+    throw new Error('Usuário não é uma empresa');
+  }
+  await Usuario.update({ status: 'ativo' }, { where: { usuario_id: id } });
+  return Usuario.findByPk(id);
+}
+
+const MODALIDADES_PONTUACAO = ['regras', '1pt_real_1pt_compra'];
+
+async function atualizarDadosEmpresa(usuario_id, dados) {
+  const { cnpj, endereco, telefone, modalidade_pontuacao, nome_regra, tipo, valor_minimo, pontos, multiplicador } = dados;
+  const usuarioExistente = await Usuario.findByPk(usuario_id, { include: [{ model: Regra, as: 'regra' }] });
+  
+  if (!usuarioExistente) {
+    throw new Error('Usuário não existe');
+  }
+  if (usuarioExistente.role !== 'empresa') {
+    throw new Error('Usuário não é uma empresa');
+  }
+
+  if (modalidade_pontuacao !== undefined && modalidade_pontuacao !== null && !MODALIDADES_PONTUACAO.includes(modalidade_pontuacao)) {
+    throw new Error('Modalidade de pontuação inválida. Use: regras ou 1pt_real_1pt_compra');
+  }
+
+  const dadosBasicos = { cnpj, endereco, telefone };
+  if (modalidade_pontuacao !== undefined) {
+    dadosBasicos.modalidade_pontuacao = modalidade_pontuacao;
+  }
+
+  await Usuario.update(dadosBasicos, { where: { usuario_id } });
+
+  if (nome_regra || tipo || pontos !== undefined || multiplicador !== undefined) {
+    const regraData = {
+      empresa_id: usuario_id,
+      nome: nome_regra || 'Regra Padrão',
+      tipo: tipo || 'por_compra',
+      valor_minimo: valor_minimo || 0,
+      pontos: pontos || 1,
+      multiplicador: multiplicador || 1.0,
+      ativa: true
+    };
+
+    let regra = usuarioExistente.regra;
+    if (regra) {
+      await Regra.update(regraData, { where: { regra_id: regra.regra_id } });
+    } else {
+      regra = await Regra.create(regraData);
+      await Usuario.update({ regra_id: regra.regra_id }, { where: { usuario_id } });
+    }
+  }
+
+  return Usuario.findByPk(usuario_id, { include: [{ model: Regra, as: 'regra' }] });
+}
+
+async function givePoints(id, pontos) {
+  const usuarioExistente = await Usuario.findByPk(id);
+  if (!usuarioExistente) {
+    throw new Error('Usuário não encontrado');
+  }
+  usuarioExistente.pontos += pontos;
+  await usuarioExistente.save();
+  return usuarioExistente;
+}
+
 module.exports = {
+  // Funções antigas
   criarUsuario,
   buscarUsuarioPorId,
   buscarUsuarioPorEmail,
@@ -237,7 +229,13 @@ module.exports = {
   deletarUsuario,
   atualizarPerfil,
   buscarUsuarioPorIdComSenha,
-  atualizarFotoPerfil,
   listarUsuarios,
   buscarIdsEmpresasFilhas,
+  // Funções novas
+  listarEmpresas,
+  tornarUsuarioAdmin,
+  tornarUsuarioEmpresa,
+  aprovarEmpresa,
+  atualizarDadosEmpresa,
+  givePoints,
 };

@@ -5,13 +5,15 @@ const authConfig = require("../config/auth.json");
 const { Op } = require("sequelize");
 
 function UsuarioController() {
+  // ==================== FUNÇÕES DO SISTEMA ANTIGO ====================
+
   async function cadastrar(req, res) {
     try {
       const { nome, telefone, email, senha, role, foto_perfil, cliente_endereco, empresa_pai_id } = req.body;
 
-      if (!nome || !telefone || !email || !senha || !role) {
+      if (!nome || !email || !senha || !role) {
         return res.status(400).json({ 
-          error: "Nome, telefone, email, senha e role são obrigatórios" 
+          error: "Nome, email, senha e role são obrigatórios" 
         });
       }
 
@@ -26,11 +28,13 @@ function UsuarioController() {
         return res.status(400).json({ error: "Email já cadastrado" });
       }
 
-      const telefoneLimpo = telefone.replace(/\D/g, '');
-      if (!/^\d{10,11}$/.test(telefoneLimpo)) {
-        return res.status(400).json({ 
-          error: "Telefone inválido. Use apenas números (10 ou 11 dígitos)." 
-        });
+      if (telefone) {
+        const telefoneLimpo = telefone.replace(/\D/g, '');
+        if (!/^\d{10,11}$/.test(telefoneLimpo)) {
+          return res.status(400).json({ 
+            error: "Telefone inválido. Use apenas números (10 ou 11 dígitos)." 
+          });
+        }
       }
 
       if (foto_perfil) {
@@ -54,12 +58,14 @@ function UsuarioController() {
       const usuarioCriado = await usuariosRepository.criarUsuario({
         usuario: {
           nome,
-          telefone: telefoneLimpo,
+          telefone: telefone ? telefone.replace(/\D/g, '') : null,
           email,
           senha,
           role,
           cliente_endereco: cliente_endereco || null,
-          empresa_pai_id: empresaPaiIdFinal
+          empresa_pai_id: empresaPaiIdFinal,
+          status: role === 'empresa' ? 'pendente' : 'ativo',
+          pontos: 0
         },
         fotoPerfilBase64: foto_perfil
       });
@@ -116,6 +122,8 @@ function UsuarioController() {
           nome: usuario.nome,
           telefone: usuario.telefone,
           foto_perfil: usuario.foto_perfil,
+          pontos: usuario.pontos,
+          status: usuario.status,
           empresa_pai_id: usuario.empresa_pai_id || null
         },
         token
@@ -137,7 +145,7 @@ function UsuarioController() {
 
       switch (userRole) {
         case 'admin':
-          console.log('🔑 Admin logado - mostrando todos os usuários');
+          console.log('Admin logado - mostrando todos os usuários');
           break;
           
         case 'empresa':
@@ -146,7 +154,6 @@ function UsuarioController() {
             { role: 'empresa', empresa_pai_id: req.user.usuario_id },
             { role: 'cliente' }
           ];
-          console.log('🏢 Empresa logada - mostrando funcionários, empresas filhas e clientes');
           break;
           
         case 'empresa-funcionario':
@@ -157,7 +164,6 @@ function UsuarioController() {
               { role: 'empresa', empresa_pai_id: funcionario.empresa_pai_id },
               { role: 'cliente' }
             ];
-            console.log('👔 Funcionário logado - mostrando funcionários, empresas filhas e clientes da empresa pai');
           } else {
             whereClause.usuario_id = { [Op.eq]: -1 };
           }
@@ -165,7 +171,6 @@ function UsuarioController() {
           
         case 'cliente':
           whereClause.role = 'empresa';
-          console.log('👤 Cliente logado - mostrando apenas empresas');
           break;
           
         default:
@@ -174,32 +179,11 @@ function UsuarioController() {
 
       const usuarios = await usuariosRepository.listarUsuarios(whereClause);
 
-      if (usuarios.length === 0) {
-        const roleMessage = userRole === 'admin' ? 'usuários' : 
-                           userRole === 'empresa' ? 'empresas e clientes' : 'empresas';
-        
-        return res.json({
-          message: `Nenhum ${roleMessage} encontrado.`,
-          usuarios: []
-        });
-      }
-
-      res.json(
-        usuarios.map((u) => {
-          const usuario = u.toJSON();
-          delete usuario.senha;
-          return {
-            usuario_id: usuario.usuario_id,
-            nome: usuario.nome,
-            telefone: usuario.telefone,
-            email: usuario.email,
-            role: usuario.role,
-            foto_perfil: usuario.foto_perfil,
-            cliente_endereco: usuario.cliente_endereco,
-            empresa_pai_id: usuario.empresa_pai_id
-          };
-        })
-      );
+      res.json(usuarios.map((u) => {
+        const usuario = u.toJSON();
+        delete usuario.senha;
+        return usuario;
+      }));
     } catch (error) {
       console.error("Erro ao listar usuários:", error);
       res.status(500).json({ error: "Erro ao listar usuários" });
@@ -234,6 +218,8 @@ function UsuarioController() {
       delete dadosAtualizacao.usuario_id;
       delete dadosAtualizacao.role;
       delete dadosAtualizacao.foto_perfil;
+      delete dadosAtualizacao.pontos;
+      delete dadosAtualizacao.status;
 
       if (dadosAtualizacao.telefone) {
         const telefoneLimpo = dadosAtualizacao.telefone.replace(/\D/g, '');
@@ -279,6 +265,8 @@ function UsuarioController() {
       delete dadosAtualizacao.role;
       delete dadosAtualizacao.usuario_id;
       delete dadosAtualizacao.foto_perfil;
+      delete dadosAtualizacao.pontos;
+      delete dadosAtualizacao.status;
 
       if (dadosAtualizacao.telefone) {
         const telefoneLimpo = dadosAtualizacao.telefone.replace(/\D/g, '');
@@ -401,7 +389,144 @@ function UsuarioController() {
     }
   }
 
+  // ==================== FUNÇÕES DO NOVO SISTEMA ====================
+
+  async function visualizarUsuario(req, res) {
+    try {
+      const usuarios = await usuariosRepository.listarUsuarios();
+      res.json(usuarios.map(u => {
+        const usuario = u.toJSON();
+        delete usuario.senha;
+        return usuario;
+      }));
+    } catch (error) {
+      console.error('Erro ao obter usuários:', error);
+      res.status(500).json({ error: 'Erro ao obter usuários' });
+    }
+  }
+
+  async function tornarAdmin(req, res) {
+    const { id } = req.body;
+    const { role } = req.user;
+    if (role !== 'admin') {
+      return res.status(403).json({ error: 'Apenas administradores podem promover usuários a admin' });
+    }
+    try {
+      const usuarioAtualizado = await usuariosRepository.tornarUsuarioAdmin(id);
+      const usuarioRetorno = usuarioAtualizado.toJSON();
+      delete usuarioRetorno.senha;
+      res.json({
+        message: `Usuário com ID ${id} agora é administrador`,
+        usuario: usuarioRetorno
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar usuário para admin:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async function tornarEmpresa(req, res) {
+    const { id } = req.body;
+    const { role } = req.user;
+    if (role !== 'admin') {
+      return res.status(403).json({ error: 'Apenas administradores podem tornar usuários em empresas' });
+    }
+    try {
+      const usuarioAtualizado = await usuariosRepository.tornarUsuarioEmpresa(id);
+      const usuarioRetorno = usuarioAtualizado.toJSON();
+      delete usuarioRetorno.senha;
+      res.json({
+        message: `Usuário com ID ${id} agora é uma empresa`,
+        usuario: usuarioRetorno
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar usuário para empresa:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async function aprovarEmpresa(req, res) {
+    const { id } = req.params;
+    const { role } = req.user;
+    if (role !== 'admin') {
+      return res.status(403).json({ error: 'Apenas administradores podem aprovar empresas' });
+    }
+    try {
+      const usuarioAtualizado = await usuariosRepository.aprovarEmpresa(id);
+      const usuarioRetorno = usuarioAtualizado.toJSON();
+      delete usuarioRetorno.senha;
+      res.json({
+        message: `Empresa com ID ${id} aprovada com sucesso`,
+        usuario: usuarioRetorno
+      });
+    } catch (error) {
+      console.error('Erro ao aprovar empresa:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async function listarEmpresas(req, res) {
+    try {
+      let where = { role: 'empresa', status: 'ativo' };
+      if (req.user.role === 'empresa') {
+        where.usuario_id = { [Op.ne]: req.user.usuario_id };
+      }
+      const empresas = await usuariosRepository.listarEmpresas(where);
+      res.json(empresas.map(e => {
+        const empresa = e.toJSON();
+        delete empresa.senha;
+        return empresa;
+      }));
+    } catch (error) {
+      console.error('Erro ao listar empresas:', error);
+      res.status(500).json({ error: 'Erro ao listar empresas' });
+    }
+  }
+
+  async function atualizarDadosEmpresa(req, res) {
+    const dados = req.body;
+    const { usuario_id, role } = req.user;
+    if (role !== 'empresa') {
+      return res.status(403).json({ error: 'Apenas empresas podem atualizar dados comerciais' });
+    }
+    try {
+      const usuarioAtualizado = await usuariosRepository.atualizarDadosEmpresa(usuario_id, dados);
+      const usuarioRetorno = usuarioAtualizado.toJSON();
+      delete usuarioRetorno.senha;
+      res.json({
+        message: 'Dados da empresa atualizados com sucesso',
+        usuario: usuarioRetorno
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar dados da empresa:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async function givePoints(req, res) {
+    const { id } = req.params;
+    const { pontos } = req.body;
+    const { role } = req.user;
+    if (role !== 'admin') {
+      return res.status(403).json({ error: 'Apenas administradores podem adicionar pontos' });
+    }
+    try {
+      const usuarioAtualizado = await usuariosRepository.givePoints(id, pontos);
+      const usuarioRetorno = usuarioAtualizado.toJSON();
+      delete usuarioRetorno.senha;
+      res.json({
+        message: `Pontos adicionados com sucesso ao usuário ${usuarioAtualizado.nome}`,
+        usuario: usuarioRetorno
+      });
+    } catch (error) {
+      console.error('Erro ao adicionar pontos:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  // ==================== RETORNO DO CONTROLLER ====================
   return {
+    // Funções do sistema antigo
     cadastrar,
     logar,
     listar,
@@ -411,6 +536,15 @@ function UsuarioController() {
     alterarSenha,
     atualizarFotoPerfil,
     deletar,
+    
+    // Funções do novo sistema
+    visualizarUsuario,
+    tornarAdmin,
+    tornarEmpresa,
+    aprovarEmpresa,
+    listarEmpresas,
+    atualizarDadosEmpresa,
+    givePoints,
   };
 }
 
