@@ -19,7 +19,7 @@ const Mensagem = sequelize.define(
         key: "conversa_id",
       },
       onUpdate: 'CASCADE',
-      onDelete: 'CASCADE', // Adiciona exclusão em cascata
+      onDelete: 'CASCADE', 
     },
     remetente_id: {
       type: Sequelize.INTEGER,

@@ -7,12 +7,6 @@ const Regra = sequelize.define('regras', {
     primaryKey: true,
     autoIncrement: true,
   },
-  empresa_id: {
-    type: Sequelize.INTEGER,
-    allowNull: false,
-    references: { model: 'usuarios', key: 'usuario_id' },
-    unique: true,  
-  },
   nome: {
     type: Sequelize.STRING,
     allowNull: false,
@@ -52,9 +46,7 @@ const Regra = sequelize.define('regras', {
   schema: 'public',
   tableName: 'regras',
   timestamps: false,
-  indexes: [  
-    { unique: true, fields: ['empresa_id'] }
-  ]
+
 });
 
 module.exports = { Regra };

@@ -1,6 +1,6 @@
 const { Sequelize } = require('sequelize');
 const { Usuario } = require('./Usuarios'); 
-// const { Recompensas } = require('./Recompensas');
+const { Recompensas } = require('./Recompensas');
 const sequelize = require('../utils/db');
 
 const SolicitacaoRecompensa = sequelize.define('SolicitacaoRecompensa', {
@@ -19,16 +19,16 @@ const SolicitacaoRecompensa = sequelize.define('SolicitacaoRecompensa', {
     onUpdate: 'CASCADE',
     onDelete: 'CASCADE',
   },
-//   recom_id: {
-//     type: Sequelize.INTEGER,
-//     allowNull: false,
-//     references: {
-//       model: Recompensas,
-//       key: 'recom_id',
-//     },
-//     onUpdate: 'CASCADE',
-//     onDelete: 'CASCADE',
-//   },
+  recom_id: {
+    type: Sequelize.INTEGER,
+    allowNull: false,
+    references: {
+      model: Recompensas,
+      key: 'recom_id',
+    },
+    onUpdate: 'CASCADE',
+    onDelete: 'CASCADE',
+  },
   status: {
     type: Sequelize.ENUM('pendente', 'aceita', 'rejeitada'),
     allowNull: false,
@@ -53,9 +53,9 @@ SolicitacaoRecompensa.belongsTo(Usuario, {
   as: 'usuario', 
 });
 
-// SolicitacaoRecompensa.belongsTo(Recompensas, {
-//   foreignKey: 'recom_id',
-//   as: 'recompensa', 
-// });
+SolicitacaoRecompensa.belongsTo(Recompensas, {
+  foreignKey: 'recom_id',
+  as: 'recompensa', 
+});
 
 module.exports = { SolicitacaoRecompensa };

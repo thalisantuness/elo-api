@@ -10,14 +10,14 @@ const Foto = sequelize.define(
       primaryKey: true,
       autoIncrement: true,
     },
-    // produto_id: {
-    //   type: Sequelize.INTEGER,
-    //   allowNull: false,
-    //   references: {
-    //     model: Produto,
-    //     key: "produto_id",
-    //   },
-    // },
+    produto_id: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      references: {
+        model: Produto,
+        key: "produto_id",
+      },
+    },
     imageData: {
       type: Sequelize.STRING,
       allowNull: false,
@@ -38,8 +38,8 @@ const Foto = sequelize.define(
   }
 );
 
-// Foto.belongsTo(Produto, { foreignKey: "produto_id", as: "produto" });
-// Produto.hasMany(Foto, { foreignKey: "produto_id", as: "fotos" });
+Foto.belongsTo(Produto, { foreignKey: "produto_id", as: "produto" });
+Produto.hasMany(Foto, { foreignKey: "produto_id", as: "fotos" });
 
 module.exports = { Foto };
 
