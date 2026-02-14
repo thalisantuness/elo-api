@@ -43,7 +43,7 @@ const chatSocketController = ChatSocketController(io);
 io.on("connection", chatSocketController.handleSocketConnection);
 
 sequelize
-  .sync({ force: true }) // Não dropar tabelas
+  .sync({ force: false }) // Não dropar tabelas
   .then(() => {
     console.log("Modelos sincronizados com o banco de dados");
   })
