@@ -1,6 +1,6 @@
 const { Sequelize } = require("sequelize");
 const sequelize = require("../utils/db");
-const { Regra } = require('./Regra'); 
+const { Regra } = require("./Regra");
 
 const Usuario = sequelize.define(
   "Usuario",
@@ -58,20 +58,20 @@ const Usuario = sequelize.define(
       allowNull: true,
     },
     status: {
-      type: Sequelize.ENUM('ativo', 'pendente', 'bloqueado'),
-      defaultValue: 'pendente',
+      type: Sequelize.ENUM("ativo", "pendente", "bloqueado"),
+      defaultValue: "pendente",
     },
-    regra_id: {  
-      type: Sequelize.INTEGER,
-      allowNull: true,
-      references: { model: 'regras', key: 'regra_id' },
-      onUpdate: 'CASCADE',
-      onDelete: 'SET NULL',
-    },
+    // regra_id: {
+    //   type: Sequelize.INTEGER,
+    //   allowNull: true,
+    //   references: { model: 'regras', key: 'regra_id' },
+    //   onUpdate: 'CASCADE',
+    //   onDelete: 'SET NULL',
+    // },
     modalidade_pontuacao: {
       type: Sequelize.STRING(50),
       allowNull: true,
-      defaultValue: 'regras',
+      defaultValue: "regras",
     },
     data_cadastro: {
       type: Sequelize.DATE,
@@ -89,7 +89,7 @@ const Usuario = sequelize.define(
     // indexes: [
     //   { fields: ['regra_id'] }
     // ]
-  }
+  },
 );
 
 // Usuario.belongsTo(Regra, {
