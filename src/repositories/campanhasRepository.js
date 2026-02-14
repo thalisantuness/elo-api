@@ -1,20 +1,93 @@
 const { Campanha } = require('../model/Campanha');
 const { Usuario } = require('../model/Usuarios');
+const sequelize = require("../utils/db");
+const s3 = require("../utils/awsConfig");
+const { v4: uuidv4 } = require("uuid");
+const sharp = require("sharp");
+
+// ==================== FUNÇÕES DE UPLOAD (IGUAL AO USUÁRIO) ====================
+
+async function deleteFromS3(fileUrl) {
+  if (!fileUrl || !fileUrl.includes(process.env.AWS_BUCKET_NAME)) {
+    console.log("URL inválida ou não pertence ao bucket. Nenhuma ação de exclusão tomada.");
+    return;
+  }
+  try {
+    const key = fileUrl.split('.com/')[1];
+    await s3.deleteObject({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: key,
+    }).promise();
+    console.log(`Arquivo deletado do S3: ${key}`);
+  } catch (error) {
+    console.error("Erro ao deletar arquivo do S3:", error);
+  }
+}
+
+// Helper para fazer upload de uma nova imagem para o S3
+async function uploadToS3(base64Image, folder) {
+  if (!base64Image || !base64Image.startsWith('data:image')) {
+    throw new Error('Formato de imagem Base64 inválido');
+  }
+  try {
+    const buffer = Buffer.from(base64Image.split(',')[1], 'base64');
+    const compressedBuffer = await sharp(buffer)
+      .resize(1200, 630, { fit: 'inside', withoutEnlargement: true }) // Tamanho bom para banners
+      .jpeg({ quality: 85 })
+      .toBuffer();
+
+    const key = `${folder}/${uuidv4()}.jpg`;
+    const uploadResult = await s3.upload({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: key,
+      Body: compressedBuffer,
+      ContentType: 'image/jpeg',
+      ACL: 'public-read'
+    }).promise();
+
+    console.log(`Upload realizado com sucesso: ${uploadResult.Location}`);
+    return uploadResult.Location;
+  } catch (error) {
+    console.error('Erro ao fazer upload para o S3:', error);
+    throw new Error('Falha no upload da imagem');
+  }
+}
+
+// ==================== FUNÇÕES DE CAMPANHA ====================
 
 async function criar(dados) {
-  const { empresa_id, titulo, descricao, imagem_url, recompensas, data_inicio, data_fim, ativa } = dados;
+  const { empresa_id, titulo, descricao, imagem_base64, recompensas, data_inicio, data_fim, ativa } = dados;
+  
   if (!titulo || !data_inicio || !data_fim) {
     throw new Error('titulo, data_inicio e data_fim são obrigatórios');
   }
-  return Campanha.create({
-    empresa_id,
-    titulo,
-    descricao: descricao || null,
-    imagem_url: imagem_url || null,
-    recompensas: Array.isArray(recompensas) ? recompensas : [],
-    data_inicio,
-    data_fim,
-    ativa: ativa !== false,
+
+  return sequelize.transaction(async (t) => {
+    let imagem_url = null;
+    
+    // Fazer upload da imagem se fornecida (igual ao usuário)
+    if (imagem_base64 && imagem_base64.startsWith('data:image')) {
+      try {
+        imagem_url = await uploadToS3(imagem_base64, 'campanhas');
+        console.log('Imagem da campanha enviada para S3:', imagem_url);
+      } catch (uploadError) {
+        console.error('Erro no upload da imagem:', uploadError);
+        throw new Error(`Erro ao processar imagem da campanha: ${uploadError.message}`);
+      }
+    }
+
+    const campanhaCriada = await Campanha.create({
+      empresa_id,
+      titulo,
+      descricao: descricao || null,
+      imagem_url,
+      recompensas: Array.isArray(recompensas) ? recompensas : [],
+      data_inicio,
+      data_fim,
+      ativa: ativa !== false,
+    }, { transaction: t });
+
+    return campanhaCriada;
   });
 }
 
@@ -30,7 +103,7 @@ async function listarTodas() {
     include: [{
       model: Usuario,
       as: 'empresa',
-      attributes: ['usuario_id', 'nome', 'email'],
+      attributes: ['usuario_id', 'nome', 'email', 'foto_perfil'],
     }],
     order: [['data_cadastro', 'DESC']],
   });
@@ -41,34 +114,82 @@ async function buscarPorId(id) {
     include: [{
       model: Usuario,
       as: 'empresa',
-      attributes: ['usuario_id', 'nome', 'email'],
+      attributes: ['usuario_id', 'nome', 'email', 'foto_perfil'],
     }],
   });
+  
   if (!campanha) {
     throw new Error(`Campanha com ID ${id} não encontrada`);
   }
+  
   return campanha;
 }
 
 async function atualizar(id, dados) {
-  const campanha = await buscarPorId(id);
-  const { titulo, descricao, imagem_url, recompensas, data_inicio, data_fim, ativa } = dados;
-  const atualizacao = {};
-  if (titulo !== undefined) atualizacao.titulo = titulo;
-  if (descricao !== undefined) atualizacao.descricao = descricao;
-  if (imagem_url !== undefined) atualizacao.imagem_url = imagem_url;
-  if (recompensas !== undefined) atualizacao.recompensas = Array.isArray(recompensas) ? recompensas : campanha.recompensas;
-  if (data_inicio !== undefined) atualizacao.data_inicio = data_inicio;
-  if (data_fim !== undefined) atualizacao.data_fim = data_fim;
-  if (ativa !== undefined) atualizacao.ativa = ativa;
-  await Campanha.update(atualizacao, { where: { campanha_id: id } });
-  return buscarPorId(id);
+  const { titulo, descricao, imagem_base64, recompensas, data_inicio, data_fim, ativa } = dados;
+  
+  return sequelize.transaction(async (t) => {
+    const campanha = await Campanha.findByPk(id, { transaction: t });
+    
+    if (!campanha) {
+      throw new Error(`Campanha com ID ${id} não encontrada`);
+    }
+    
+    const atualizacao = {};
+    
+    if (titulo !== undefined) atualizacao.titulo = titulo;
+    if (descricao !== undefined) atualizacao.descricao = descricao;
+    if (recompensas !== undefined) atualizacao.recompensas = Array.isArray(recompensas) ? recompensas : campanha.recompensas;
+    if (data_inicio !== undefined) atualizacao.data_inicio = data_inicio;
+    if (data_fim !== undefined) atualizacao.data_fim = data_fim;
+    if (ativa !== undefined) atualizacao.ativa = ativa;
+    
+    // Processar nova imagem se fornecida (igual ao usuário)
+    if (imagem_base64 && imagem_base64.startsWith('data:image')) {
+      // Deletar imagem antiga do S3 se existir
+      if (campanha.imagem_url && campanha.imagem_url.includes(process.env.AWS_BUCKET_NAME)) {
+        await deleteFromS3(campanha.imagem_url);
+      }
+      
+      // Upload da nova imagem
+      atualizacao.imagem_url = await uploadToS3(imagem_base64, 'campanhas');
+    } else if (imagem_base64 === null) {
+      // Se enviar null, deletar imagem antiga
+      if (campanha.imagem_url && campanha.imagem_url.includes(process.env.AWS_BUCKET_NAME)) {
+        await deleteFromS3(campanha.imagem_url);
+      }
+      atualizacao.imagem_url = null;
+    }
+    
+    await Campanha.update(atualizacao, { 
+      where: { campanha_id: id },
+      transaction: t 
+    });
+    
+    return buscarPorId(id);
+  });
 }
 
 async function excluir(id) {
-  await buscarPorId(id);
-  await Campanha.destroy({ where: { campanha_id: id } });
-  return true;
+  return sequelize.transaction(async (t) => {
+    const campanha = await Campanha.findByPk(id, { transaction: t });
+    
+    if (!campanha) {
+      throw new Error(`Campanha com ID ${id} não encontrada`);
+    }
+    
+    // Deletar imagem do S3 se existir (igual ao usuário)
+    if (campanha.imagem_url && campanha.imagem_url.includes(process.env.AWS_BUCKET_NAME)) {
+      await deleteFromS3(campanha.imagem_url);
+    }
+    
+    await Campanha.destroy({ 
+      where: { campanha_id: id },
+      transaction: t 
+    });
+    
+    return true;
+  });
 }
 
 module.exports = {

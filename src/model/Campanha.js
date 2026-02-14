@@ -23,7 +23,7 @@ const Campanha = sequelize.define('campanhas', {
     allowNull: true,
   },
   imagem_url: {
-    type: Sequelize.STRING(255),
+    type: Sequelize.TEXT,  // MUDADO DE STRING(255) PARA TEXT (igual foto_perfil do usuário)
     allowNull: true,
   },
   recompensas: {
