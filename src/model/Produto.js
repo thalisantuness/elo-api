@@ -2,7 +2,6 @@ const { Sequelize } = require("sequelize");
 const sequelize = require("../utils/db");
 const { Usuario } = require("./Usuarios");
 
-
 const Produto = sequelize.define(
   "Produto",
   {
@@ -11,6 +10,14 @@ const Produto = sequelize.define(
       primaryKey: true,
       autoIncrement: true,
     },
+    //     empresa_id: {
+    //   type: Sequelize.INTEGER,
+    //   allowNull: false,
+    //   references: {
+    //     model: "usuarios",
+    //     key: "usuario_id",
+    //   },
+    // },
     nome: {
       type: Sequelize.STRING,
       allowNull: false,
@@ -19,14 +26,14 @@ const Produto = sequelize.define(
       type: Sequelize.FLOAT,
       allowNull: false,
     },
-     valor_custo: {
+    valor_custo: {
       type: Sequelize.FLOAT,
       allowNull: false,
     },
-     quantidade: {
-        type: Sequelize.INTEGER,
-        allowNull: false,
-      },
+    quantidade: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+    },
     tipo_comercializacao: {
       type: Sequelize.STRING,
       allowNull: false,
@@ -35,27 +42,12 @@ const Produto = sequelize.define(
       type: Sequelize.STRING,
       allowNull: false,
     },
-    empresa_id: {
-      type: Sequelize.INTEGER,
-      allowNull: false,
-      references: {
-        model: "usuarios",
-        key: "usuario_id",
-      },
-    },
+
     empresas_autorizadas: {
       type: Sequelize.ARRAY(Sequelize.INTEGER),
       allowNull: true,
       defaultValue: [],
     },
-    // estado_id: {
-    //   type: Sequelize.INTEGER,
-    //   allowNull: true,
-    //   references: {
-    //     model: Estado,
-    //     key: "estado_id",
-    //   },
-    // },
     foto_principal: {
       type: Sequelize.TEXT,
       allowNull: true,
@@ -76,9 +68,6 @@ const Produto = sequelize.define(
   }
 );
 
-// Associação com Empresa (Usuario)
-Produto.belongsTo(Usuario, { foreignKey: "empresa_id", as: "Empresa" });
+// Produto.belongsTo(Usuario, { foreignKey: "empresa_id", as: "Empresa" });
 
 module.exports = { Produto };
-
-

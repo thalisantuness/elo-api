@@ -2,34 +2,30 @@ const usuariosRepository = require("../repositories/usuariosRepository");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const authConfig = require("../config/auth.json");
-const { Sequelize, Op } = require("sequelize");
+const { Op } = require("sequelize");
 
 function UsuarioController() {
   async function cadastrar(req, res) {
     try {
       const { nome, telefone, email, senha, role, foto_perfil, cliente_endereco, empresa_pai_id } = req.body;
 
-      // Validações básicas
       if (!nome || !telefone || !email || !senha || !role) {
         return res.status(400).json({ 
           error: "Nome, telefone, email, senha e role são obrigatórios" 
         });
       }
 
-      // Validar role
       if (!["cliente", "empresa", "admin", "empresa-funcionario"].includes(role)) {
         return res.status(400).json({ 
           error: "Role inválido. Use 'cliente', 'empresa', 'admin' ou 'empresa-funcionario'." 
         });
       }
 
-      // Verificar se o email já existe
       const usuarioExistente = await usuariosRepository.buscarUsuarioPorEmail(email);
       if (usuarioExistente) {
         return res.status(400).json({ error: "Email já cadastrado" });
       }
 
-      // Validar formato do telefone (10 ou 11 dígitos)
       const telefoneLimpo = telefone.replace(/\D/g, '');
       if (!/^\d{10,11}$/.test(telefoneLimpo)) {
         return res.status(400).json({ 
@@ -37,29 +33,24 @@ function UsuarioController() {
         });
       }
 
-      // Validar formato da foto (igual produtos) - se fornecida
       if (foto_perfil) {
         if (!foto_perfil.startsWith('data:image')) {
           return res.status(400).json({ 
             error: "Formato inválido para a foto de perfil (deve ser base64 'data:image/...')" 
           });
         }
-        // Limite de tamanho (igual produtos)
-        if (foto_perfil.length > 5000000) {  // ~5MB base64
+        if (foto_perfil.length > 5000000) {
           return res.status(400).json({ error: "Foto muito grande (máx 5MB)" });
         }
       }
 
-      // Lógica de empresa_pai_id: se empresa logada cria funcionário/cliente/empresa filha, vincular automaticamente
       let empresaPaiIdFinal = empresa_pai_id || null;
       if (req.user && req.user.role === 'empresa') {
-        // Se empresa está criando um funcionário, cliente ou outra empresa, vincular a ela
         if (role === 'empresa-funcionario' || role === 'cliente' || role === 'empresa') {
           empresaPaiIdFinal = req.user.usuario_id;
         }
       }
 
-      // Criar usuário - repo valida/comprime/upload e salva link
       const usuarioCriado = await usuariosRepository.criarUsuario({
         usuario: {
           nome,
@@ -78,13 +69,13 @@ function UsuarioController() {
 
       res.status(201).json({
         message: "Usuário cadastrado com sucesso",
-        usuario: usuarioRetorno  // foto_perfil: link S3
+        usuario: usuarioRetorno
       });
     } catch (error) {
       console.error("Erro no cadastro:", error);
       res.status(500).json({
         error: "Erro ao cadastrar usuário",
-        details: error.message  // Ex: "Erro ao processar imagem" se base64 inválido
+        details: error.message
       });
     }
   }
@@ -124,7 +115,7 @@ function UsuarioController() {
           role: usuario.role,
           nome: usuario.nome,
           telefone: usuario.telefone,
-          foto_perfil: usuario.foto_perfil,  // Já é link do S3
+          foto_perfil: usuario.foto_perfil,
           empresa_pai_id: usuario.empresa_pai_id || null
         },
         token
@@ -141,76 +132,38 @@ function UsuarioController() {
     try {
       const { role: userRole } = req.user;
       let whereClause = {
-        usuario_id: { [Op.ne]: req.user.usuario_id } // Excluir o próprio usuário
+        usuario_id: { [Op.ne]: req.user.usuario_id }
       };
 
-      // Definir quais roles o usuário pode ver baseado no seu role
       switch (userRole) {
         case 'admin':
-          // Admin vê todos os usuários (incluindo outros admins)
           console.log('🔑 Admin logado - mostrando todos os usuários');
           break;
           
         case 'empresa':
-          // Empresa vê:
-          // 1. Seus funcionários (empresa-funcionario com empresa_pai_id = empresa)
-          // 2. Empresas filhas (empresa com empresa_pai_id = empresa)
-          // 3. Clientes que têm pedidos com ela (baseado em pedidos, não empresa_pai_id)
-          const funcionariosEEmpresasFilhas = [
+          whereClause[Op.or] = [
             { role: 'empresa-funcionario', empresa_pai_id: req.user.usuario_id },
-            { role: 'empresa', empresa_pai_id: req.user.usuario_id }
+            { role: 'empresa', empresa_pai_id: req.user.usuario_id },
+            { role: 'cliente' }
           ];
-          
-          // Buscar clientes que têm pedidos com essa empresa
-          const clientesComPedidos = await usuariosRepository.buscarClientesPorPedidos(req.user.usuario_id);
-          const idsClientesComPedidos = clientesComPedidos.map(c => c.usuario_id);
-          
-          if (idsClientesComPedidos.length > 0) {
-            whereClause[Op.or] = [
-              ...funcionariosEEmpresasFilhas,
-              { role: 'cliente', usuario_id: { [Op.in]: idsClientesComPedidos } }
-            ];
-          } else {
-            whereClause[Op.or] = funcionariosEEmpresasFilhas;
-          }
-          
-          console.log('🏢 Empresa logada - mostrando funcionários, empresas filhas e clientes com pedidos');
+          console.log('🏢 Empresa logada - mostrando funcionários, empresas filhas e clientes');
           break;
           
         case 'empresa-funcionario':
-          // Funcionário vê os mesmos dados da empresa pai:
-          // 1. Funcionários da empresa pai
-          // 2. Empresas filhas da empresa pai
-          // 3. Clientes que têm pedidos com a empresa pai (baseado em pedidos, não empresa_pai_id)
           const funcionario = await usuariosRepository.buscarUsuarioPorId(req.user.usuario_id);
           if (funcionario && funcionario.empresa_pai_id) {
-            const funcionariosEEmpresasFilhas = [
+            whereClause[Op.or] = [
               { role: 'empresa-funcionario', empresa_pai_id: funcionario.empresa_pai_id },
-              { role: 'empresa', empresa_pai_id: funcionario.empresa_pai_id }
+              { role: 'empresa', empresa_pai_id: funcionario.empresa_pai_id },
+              { role: 'cliente' }
             ];
-            
-            // Buscar clientes que têm pedidos com a empresa pai
-            const clientesComPedidos = await usuariosRepository.buscarClientesPorPedidos(funcionario.empresa_pai_id);
-            const idsClientesComPedidos = clientesComPedidos.map(c => c.usuario_id);
-            
-            if (idsClientesComPedidos.length > 0) {
-              whereClause[Op.or] = [
-                ...funcionariosEEmpresasFilhas,
-                { role: 'cliente', usuario_id: { [Op.in]: idsClientesComPedidos } }
-              ];
-            } else {
-              whereClause[Op.or] = funcionariosEEmpresasFilhas;
-            }
-            
-            console.log('👔 Funcionário logado - mostrando funcionários, empresas filhas e clientes com pedidos da empresa pai');
+            console.log('👔 Funcionário logado - mostrando funcionários, empresas filhas e clientes da empresa pai');
           } else {
-            // Se não tem empresa_pai_id, não mostra nada
-            whereClause.usuario_id = { [Op.eq]: -1 }; // ID inexistente
+            whereClause.usuario_id = { [Op.eq]: -1 };
           }
           break;
           
         case 'cliente':
-          // Cliente vê apenas empresas (não vê admins nem outras empresas)
           whereClause.role = 'empresa';
           console.log('👤 Cliente logado - mostrando apenas empresas');
           break;
@@ -221,7 +174,6 @@ function UsuarioController() {
 
       const usuarios = await usuariosRepository.listarUsuarios(whereClause);
 
-      // Se não encontrar usuários, retornar array vazio com mensagem explicativa
       if (usuarios.length === 0) {
         const roleMessage = userRole === 'admin' ? 'usuários' : 
                            userRole === 'empresa' ? 'empresas e clientes' : 'empresas';
@@ -242,7 +194,7 @@ function UsuarioController() {
             telefone: usuario.telefone,
             email: usuario.email,
             role: usuario.role,
-            foto_perfil: usuario.foto_perfil,  // Link do S3
+            foto_perfil: usuario.foto_perfil,
             cliente_endereco: usuario.cliente_endereco,
             empresa_pai_id: usuario.empresa_pai_id
           };
@@ -266,7 +218,7 @@ function UsuarioController() {
       const usuarioRetorno = usuario.toJSON();
       delete usuarioRetorno.senha;
 
-      res.json(usuarioRetorno);  // foto_perfil é link
+      res.json(usuarioRetorno);
     } catch (error) {
       console.error("Erro ao buscar usuário:", error);
       res.status(500).json({ error: "Erro ao buscar usuário" });
@@ -278,15 +230,11 @@ function UsuarioController() {
       const { id } = req.params;
       const dadosAtualizacao = req.body;
 
-      // Não permitir atualização de campos críticos
       delete dadosAtualizacao.senha;
       delete dadosAtualizacao.usuario_id;
       delete dadosAtualizacao.role;
-      delete dadosAtualizacao.foto_perfil; // Atualizar foto por endpoint separado
+      delete dadosAtualizacao.foto_perfil;
 
-      // Campos permitidos: nome, telefone, email, cliente_endereco (e outros campos do model exceto os bloqueados acima)
-
-      // Validar telefone se fornecido
       if (dadosAtualizacao.telefone) {
         const telefoneLimpo = dadosAtualizacao.telefone.replace(/\D/g, '');
         if (!/^\d{10,11}$/.test(telefoneLimpo)) {
@@ -323,18 +271,15 @@ function UsuarioController() {
       const dadosAtualizacao = req.body;
       const usuarioLogadoId = req.user.usuario_id;
 
-      // Verificar se o usuário está atualizando seu próprio perfil
       if (parseInt(id, 10) !== usuarioLogadoId) {
         return res.status(403).json({ error: "Não autorizado a editar este perfil." });
       }
 
-      // Não permitir atualização de campos críticos
       delete dadosAtualizacao.senha;
       delete dadosAtualizacao.role;
       delete dadosAtualizacao.usuario_id;
-      delete dadosAtualizacao.foto_perfil; // Atualizar foto por endpoint separado
+      delete dadosAtualizacao.foto_perfil;
 
-      // Validar telefone se fornecido
       if (dadosAtualizacao.telefone) {
         const telefoneLimpo = dadosAtualizacao.telefone.replace(/\D/g, '');
         if (!/^\d{10,11}$/.test(telefoneLimpo)) {
@@ -373,7 +318,6 @@ function UsuarioController() {
       const { senhaAtual, novaSenha } = req.body;
       const usuarioLogadoId = req.user.usuario_id;
 
-      // Verificar autorização
       if (parseInt(id, 10) !== usuarioLogadoId) {
         return res.status(403).json({ error: "Não autorizado." });
       }
@@ -384,19 +328,16 @@ function UsuarioController() {
         });
       }
 
-      // Buscar usuário com senha
       const usuario = await usuariosRepository.buscarUsuarioPorIdComSenha(id);
       if (!usuario) {
         return res.status(404).json({ error: "Usuário não encontrado." });
       }
 
-      // Validar senha atual
       const senhaValida = await bcrypt.compare(senhaAtual, usuario.senha);
       if (!senhaValida) {
         return res.status(401).json({ error: "Senha atual incorreta." });
       }
 
-      // Atualizar senha
       const senhaHash = await bcrypt.hash(novaSenha, 10);
       await usuariosRepository.atualizarUsuario(id, { senha: senhaHash });
 
@@ -414,7 +355,6 @@ function UsuarioController() {
       const { foto_perfil } = req.body;
       const usuarioLogadoId = req.user.usuario_id;
 
-      // Verificar autorização
       if (parseInt(id, 10) !== usuarioLogadoId) {
         return res.status(403).json({ error: "Não autorizado." });
       }
@@ -429,16 +369,15 @@ function UsuarioController() {
         });
       }
 
-      // Limite de tamanho (igual produtos)
       if (foto_perfil.length > 5000000) {
         return res.status(400).json({ error: "Foto muito grande (máx 5MB)" });
       }
 
-      const updatedUser = await usuariosRepository.atualizarFotoPerfil(id, foto_perfil);  // Repo processa e salva link
+      const updatedUser = await usuariosRepository.atualizarFotoPerfil(id, foto_perfil);
 
       res.status(200).json({
         message: "Foto de perfil atualizada com sucesso!",
-        usuario: updatedUser  // foto_perfil: novo link S3
+        usuario: updatedUser
       });
     } catch (error) {
       console.error("Erro ao atualizar foto de perfil:", error);

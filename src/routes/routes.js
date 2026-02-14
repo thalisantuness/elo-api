@@ -38,10 +38,6 @@ const ChatController = require("../controllers/chatController");
 const chatController = ChatController();
 const ProdutoController = require("../controllers/produtoController");
 const produtoController = ProdutoController();
-const PedidoController = require("../controllers/pedidoController");
-const pedidoController = PedidoController();
-const FaturamentoController = require("../controllers/faturamentoController");
-const faturamentoController = FaturamentoController();
 
 router.post("/cadastrar", usuariosController.cadastrar);
 router.post("/login", usuariosController.logar);
@@ -53,9 +49,6 @@ router.patch("/usuarios/:id/senha", authMiddleware, usuariosController.alterarSe
 router.patch("/usuarios/:id/foto", authMiddleware, usuariosController.atualizarFotoPerfil);
 router.delete("/usuarios/:id", usuariosController.deletar);
 
-// GET /produtos usa autenticação OPCIONAL:
-// - Sem token ou com role cliente/admin -> marketplace (todos os produtos)
-// - Com role empresa/empresa-funcionario -> filtrado pela empresa correta
 router.get("/produtos", optionalAuth, produtoController.listar);
 router.get("/produtos/:id", produtoController.buscarPorId);
 router.post("/produtos", authMiddleware, produtoController.criar);
@@ -63,17 +56,6 @@ router.put("/produtos/:id", authMiddleware, produtoController.atualizar);
 router.delete("/produtos/:id/fotos/:fotoId", authMiddleware, produtoController.deletarFoto);
 router.delete("/produtos/:id", produtoController.deletar);
 router.post("/produtos/:id/fotos", authMiddleware, produtoController.adicionarFoto);
-
-// Pedidos
-router.get("/pedidos", authMiddleware, pedidoController.listar);
-router.post("/pedidos", authMiddleware, pedidoController.criar);
-router.get("/pedidos/:id", authMiddleware, pedidoController.buscarPorId);
-router.put("/pedidos/:id", authMiddleware, pedidoController.atualizar);
-router.put("/pedidos/:id/cancelar", authMiddleware, pedidoController.cancelar);
-router.delete("/pedidos/:id", authMiddleware, pedidoController.excluir);
-
-// Gráfico de Faturamentos
-router.get("/grafico-faturamentos", authMiddleware, faturamentoController.getGraficoFaturamentos);
 
 // Rotas de Chat
 router.get("/conversas", authMiddleware, chatController.listarConversas);

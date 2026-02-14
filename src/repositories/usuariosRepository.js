@@ -3,11 +3,10 @@ const { v4: uuidv4 } = require("uuid");
 const sharp = require("sharp");
 const bcrypt = require("bcrypt");
 const { Usuario } = require("../model/Usuarios");
-const { Pedido } = require("../model/Pedido");
 const sequelize = require("../utils/db");
 const { Op } = require("sequelize");
 
-// Helper para deletar um arquivo do S3 a partir da URL (igual produtos)
+// Helper para deletar um arquivo do S3 a partir da URL
 async function deleteFromS3(fileUrl) {
   if (!fileUrl || !fileUrl.includes(process.env.AWS_BUCKET_NAME)) {
     console.log("URL inválida ou não pertence ao bucket.");
@@ -25,7 +24,7 @@ async function deleteFromS3(fileUrl) {
   }
 }
 
-// Validação de base64 (copiado dos produtos)
+// Validação de base64
 function validateBase64Image(base64String) {
   if (!base64String || typeof base64String !== 'string') {
     throw new Error('String base64 inválida');
@@ -45,7 +44,6 @@ function validateBase64Image(base64String) {
     throw new Error('Dados de imagem base64 muito pequenos ou vazios');
   }
 
-  // Verificar se é base64 válido
   const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
   if (!base64Regex.test(base64Data)) {
     throw new Error('Dados base64 contêm caracteres inválidos');
@@ -54,15 +52,13 @@ function validateBase64Image(base64String) {
   return base64Data;
 }
 
-// Compress imagem (copiado dos produtos, com logs)
+// Compress imagem
 async function compressImage(buffer) {
   try {
-    // Verificar se o buffer tem conteúdo
     if (!buffer || buffer.length === 0) {
       throw new Error('Buffer de imagem vazio');
     }
 
-    // Verificar se o buffer é uma imagem válida
     const metadata = await sharp(buffer).metadata();
     console.log('Metadata da imagem:', metadata);
     
@@ -70,7 +66,6 @@ async function compressImage(buffer) {
       throw new Error('Formato de imagem não suportado');
     }
     
-    // Redimensionar e comprimir a imagem
     return await sharp(buffer)
       .resize(800, 800, { 
         fit: 'inside',
@@ -85,10 +80,9 @@ async function compressImage(buffer) {
   }
 }
 
-// Upload pro S3 (ajustado pra usar compress + validate, igual produtos)
+// Upload pro S3
 async function uploadToS3(base64Image, folder) {
   try {
-    // Valida base64
     const base64Data = validateBase64Image(base64Image);
     console.log('Processando foto, tamanho base64:', base64Data.length);
     
@@ -108,7 +102,7 @@ async function uploadToS3(base64Image, folder) {
     }).promise();
     
     console.log(`Upload realizado com sucesso: ${result.Location}`);
-    return result.Location;  // Só o LINK
+    return result.Location;
   } catch (error) {
     console.error('Erro no upload para S3:', error.message);
     throw error;
@@ -124,14 +118,13 @@ async function criarUsuario(dados) {
     let foto_perfil = null;
 
     if (fotoPerfilBase64) {
-      // Upload OBRIGATÓRIO com validate/compress - salva só link
       foto_perfil = await uploadToS3(fotoPerfilBase64, 'usuarios/perfil');
     }
 
     const usuarioCriado = await Usuario.create({
       ...usuario,
       senha: senhaHash,
-      foto_perfil  // Só link ou null
+      foto_perfil
     }, { transaction: t });
 
     return usuarioCriado;
@@ -140,7 +133,7 @@ async function criarUsuario(dados) {
 
 async function buscarUsuarioPorId(id) {
   const usuario = await Usuario.findByPk(id);
-  return usuario;  // foto_perfil já é link do S3
+  return usuario;
 }
 
 async function buscarUsuarioPorEmail(email) {
@@ -190,7 +183,6 @@ async function atualizarFotoPerfil(usuarioId, imageBase64) {
       await deleteFromS3(oldFileUrl);
     }
 
-    // Upload OBRIGATÓRIO com validate/compress - salva só link
     const newFileUrl = await uploadToS3(imageBase64, 'usuarios/perfil');
 
     usuario.foto_perfil = newFileUrl;
@@ -204,7 +196,7 @@ async function atualizarFotoPerfil(usuarioId, imageBase64) {
 
 async function listarUsuarios(filtros = {}) {
   const usuarios = await Usuario.findAll({ where: filtros });
-  return usuarios;  // foto_perfil já é link
+  return usuarios;
 }
 
 /**
@@ -214,16 +206,13 @@ async function listarUsuarios(filtros = {}) {
  * @returns {Promise<number[]>} Array com IDs da empresa pai + todas as empresas filhas
  */
 async function buscarIdsEmpresasFilhas(empresaPaiId, visitados = new Set()) {
-  // Proteção contra loops infinitos
   if (visitados.has(empresaPaiId)) {
     return [];
   }
   visitados.add(empresaPaiId);
   
-  // Incluir a própria empresa pai
   const idsEmpresas = [empresaPaiId];
   
-  // Buscar empresas filhas diretas
   const empresasFilhas = await Usuario.findAll({
     where: {
       role: 'empresa',
@@ -232,51 +221,12 @@ async function buscarIdsEmpresasFilhas(empresaPaiId, visitados = new Set()) {
     attributes: ['usuario_id']
   });
   
-  // Buscar empresas filhas recursivamente (empresas filhas de empresas filhas)
   for (const empresaFilha of empresasFilhas) {
     const empresasNetas = await buscarIdsEmpresasFilhas(empresaFilha.usuario_id, visitados);
     idsEmpresas.push(...empresasNetas);
   }
   
-  // Remover duplicatas
   return [...new Set(idsEmpresas)];
-}
-
-/**
- * Busca clientes que têm pedidos com uma empresa (ou suas empresas filhas)
- * Regra: Se o cliente fez um pedido com a empresa, ele já pode ser listado como cliente daquela empresa
- * @param {number} empresaId - ID da empresa pai
- * @returns {Promise<Usuario[]>} Array com os clientes que têm pedidos com essa empresa
- */
-async function buscarClientesPorPedidos(empresaId) {
-  // Buscar IDs de todas as empresas (pai + filhas)
-  const idsEmpresas = await buscarIdsEmpresasFilhas(empresaId);
-  
-  // Buscar pedidos com essas empresas e extrair os IDs únicos dos clientes usando DISTINCT
-  const pedidos = await Pedido.findAll({
-    where: {
-      empresa_id: { [Op.in]: idsEmpresas }
-    },
-    attributes: [[sequelize.fn('DISTINCT', sequelize.col('cliente_id')), 'cliente_id']],
-    raw: true
-  });
-  
-  const idsClientes = pedidos.map(p => p.cliente_id).filter(id => id !== null);
-  
-  // Se não houver clientes, retornar array vazio
-  if (idsClientes.length === 0) {
-    return [];
-  }
-  
-  // Buscar os clientes
-  const clientes = await Usuario.findAll({
-    where: {
-      usuario_id: { [Op.in]: idsClientes },
-      role: 'cliente'
-    }
-  });
-  
-  return clientes;
 }
 
 module.exports = {
@@ -290,5 +240,4 @@ module.exports = {
   atualizarFotoPerfil,
   listarUsuarios,
   buscarIdsEmpresasFilhas,
-  buscarClientesPorPedidos,
 };

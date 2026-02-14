@@ -1,5 +1,6 @@
 const { Sequelize } = require("sequelize");
 const sequelize = require("../utils/db");
+const { Regra } = require('./Regra'); 
 
 const Usuario = sequelize.define(
   "Usuario",
@@ -9,8 +10,16 @@ const Usuario = sequelize.define(
       primaryKey: true,
       autoIncrement: true,
     },
+    //     empresa_pai_id: {
+    //   type: Sequelize.INTEGER,
+    //   allowNull: true,
+    //   references: {
+    //     model: "usuarios",
+    //     key: "usuario_id",
+    //   },
+    // },
     role: {
-      type: Sequelize.STRING, 
+      type: Sequelize.STRING,
       allowNull: false,
     },
     nome: {
@@ -18,8 +27,8 @@ const Usuario = sequelize.define(
       allowNull: false,
     },
     telefone: {
-      type: Sequelize.STRING,
-      allowNull: false,
+      type: Sequelize.STRING(20),
+      allowNull: true,
     },
     email: {
       type: Sequelize.STRING,
@@ -31,20 +40,38 @@ const Usuario = sequelize.define(
       allowNull: false,
     },
     foto_perfil: {
-      type: Sequelize.TEXT,  // Igual produtos: TEXT ilimitado pra links S3
+      type: Sequelize.TEXT,
       allowNull: true,
     },
     cliente_endereco: {
       type: Sequelize.TEXT,
       allowNull: true,
     },
-    empresa_pai_id: {
+
+    pontos: {
       type: Sequelize.INTEGER,
       allowNull: true,
-      references: {
-        model: "usuarios",
-        key: "usuario_id",
-      },
+      defaultValue: 0,
+    },
+    cnpj: {
+      type: Sequelize.STRING(18),
+      allowNull: true,
+    },
+    status: {
+      type: Sequelize.ENUM('ativo', 'pendente', 'bloqueado'),
+      defaultValue: 'pendente',
+    },
+    regra_id: {  
+      type: Sequelize.INTEGER,
+      allowNull: true,
+      references: { model: 'regras', key: 'regra_id' },
+      onUpdate: 'CASCADE',
+      onDelete: 'SET NULL',
+    },
+    modalidade_pontuacao: {
+      type: Sequelize.STRING(50),
+      allowNull: true,
+      defaultValue: 'regras',
     },
     data_cadastro: {
       type: Sequelize.DATE,
@@ -59,7 +86,15 @@ const Usuario = sequelize.define(
     schema: "public",
     tableName: "usuarios",
     timestamps: false,
+    // indexes: [
+    //   { fields: ['regra_id'] }
+    // ]
   }
 );
+
+// Usuario.belongsTo(Regra, {
+//   foreignKey: 'regra_id',
+//   as: 'regra'
+// });
 
 module.exports = { Usuario };
