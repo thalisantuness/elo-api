@@ -63,6 +63,7 @@ function validarPermissaoConversa(roleRemetente, roleDestinatario) {
 // Autenticação
 router.post("/cadastrar", usuariosController.cadastrar);
 router.post("/login", usuariosController.logar);
+router.get("/usuarios", usuariosController.listar);
 
 // Usuários (público - apenas busca por ID)
 router.get("/usuarios/:id", usuariosController.buscarPorId);
@@ -78,7 +79,7 @@ router.use(authMiddleware);
 // ==================== ROTAS DE USUÁRIOS ====================
 
 // Listagem de usuários (com filtros por role)
-router.get("/usuarios", usuariosController.listar);
+
 
 // Atualizações de perfil
 router.put("/usuarios/:id", usuariosController.atualizar);
