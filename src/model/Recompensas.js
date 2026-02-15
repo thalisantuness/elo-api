@@ -19,6 +19,14 @@ const Recompensas = sequelize.define('recompensas', {
       },
     },
   },
+  descricao: {
+    type: Sequelize.TEXT,
+    allowNull: true,
+  },
+  imagem_url: {
+    type: Sequelize.TEXT,  // URL da imagem no S3 (igual foto_perfil do usuário)
+    allowNull: true,
+  },
   pontos: {
     type: Sequelize.INTEGER,
     allowNull: true, 

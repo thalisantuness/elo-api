@@ -2,8 +2,8 @@ const recompensasRepository = require('../repositories/recompensasRepository');
 
 function recompensasController() {
   async function visualizarRecompensas(req, res) {
-    const usuario_id = req.user.usuario_id;
     try {
+      const usuario_id = req.user.usuario_id;
       const recompensas = await recompensasRepository.listarRecompensas(usuario_id);
       res.json(recompensas);
     } catch (error) {
@@ -13,18 +13,39 @@ function recompensasController() {
   }
 
   async function cadastrarRecompensas(req, res) {
-    const { nome, pontos, estoque } = req.body;
-    const usuario_id = req.user.usuario_id;
-    if (!usuario_id) {
-      return res.status(400).json({ error: 'ID de usuário não encontrado' });
-    }
     try {
+      const { nome, descricao, imagem_base64, pontos, estoque } = req.body;
+      const usuario_id = req.user.usuario_id;
+      
+      if (!usuario_id) {
+        return res.status(400).json({ error: 'ID de usuário não encontrado' });
+      }
+
+      if (!nome) {
+        return res.status(400).json({ error: 'Nome da recompensa é obrigatório' });
+      }
+
+      // Validar imagem se fornecida (igual ao usuário)
+      if (imagem_base64) {
+        if (!imagem_base64.startsWith('data:image')) {
+          return res.status(400).json({ 
+            error: "Formato inválido para a imagem (deve ser base64 'data:image/...')" 
+          });
+        }
+        if (imagem_base64.length > 5000000) { // 5MB
+          return res.status(400).json({ error: "Imagem muito grande (máx 5MB)" });
+        }
+      }
+      
       const recompensa = await recompensasRepository.criarRecompensa({
         nome,
-        pontos,
-        estoque,
+        descricao,
+        imagem_base64,  // Envia base64, o repository processa
+        pontos: pontos || 0,
+        estoque: estoque || 0,
         usuario_id,
       });
+      
       res.status(201).json({ 
         message: `Recompensa ${nome} cadastrada com sucesso`, 
         recompensa 
@@ -36,14 +57,29 @@ function recompensasController() {
   }
 
   async function atualizarRecompensas(req, res) {
-    const { recom_id } = req.params;
-    const { nome, pontos, estoque } = req.body;
     try {
+      const { recom_id } = req.params;
+      const { nome, descricao, imagem_base64, pontos, estoque } = req.body;
+      
+      // Validar imagem se fornecida (igual ao usuário)
+      if (imagem_base64 && !imagem_base64.startsWith('data:image') && imagem_base64 !== null) {
+        return res.status(400).json({ 
+          error: "Formato inválido para a imagem (deve ser base64 'data:image/...' ou null)" 
+        });
+      }
+      
+      if (imagem_base64 && imagem_base64.length > 5000000) {
+        return res.status(400).json({ error: "Imagem muito grande (máx 5MB)" });
+      }
+      
       const recompensaAtualizada = await recompensasRepository.atualizarRecompensa(recom_id, {
         nome,
+        descricao,
+        imagem_base64,  // Envia base64, o repository processa
         pontos,
         estoque,
       });
+      
       res.json({ 
         message: `Recompensa ${recom_id} atualizada com sucesso`,
         recompensa: recompensaAtualizada 
@@ -55,8 +91,8 @@ function recompensasController() {
   }
 
   async function excluirRecom(req, res) {
-    const { recom_id } = req.params;
     try {
+      const { recom_id } = req.params;
       await recompensasRepository.excluirRecompensa(recom_id);
       res.json({ message: `Recompensa ${recom_id} excluída com sucesso` });
     } catch (error) {
