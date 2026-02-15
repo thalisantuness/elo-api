@@ -7,7 +7,7 @@ const s3 = require("../utils/awsConfig");
 const { v4: uuidv4 } = require("uuid");
 const sharp = require("sharp");
 
-// ==================== FUNÇÕES DE UPLOAD (ADAPTADAS DO SEU OUTRO APP) ====================
+// ==================== FUNÇÕES DE UPLOAD ====================
 
 async function deleteFromS3(fileUrl) {
   if (!fileUrl || !fileUrl.includes(process.env.AWS_BUCKET_NAME)) {
@@ -26,7 +26,6 @@ async function deleteFromS3(fileUrl) {
   }
 }
 
-// Helper para fazer upload de uma nova imagem para o S3
 async function uploadToS3(base64Image, folder) {
   if (!base64Image || !base64Image.startsWith('data:image')) {
     throw new Error('Formato de imagem Base64 inválido');
@@ -64,7 +63,6 @@ async function criarUsuario(dados) {
   return sequelize.transaction(async (t) => {
     let foto_perfil = null;
     
-    // FAZER UPLOAD DA FOTO SE FORNECIDA (igual ao seu outro app)
     if (fotoPerfilBase64 && fotoPerfilBase64.startsWith('data:image')) {
       try {
         foto_perfil = await uploadToS3(fotoPerfilBase64, 'usuarios/perfil');
@@ -78,58 +76,50 @@ async function criarUsuario(dados) {
     const usuarioCriado = await Usuario.create({
       ...usuario,
       senha: senhaHash,
-      foto_perfil // AGORA VAI SALVAR A URL DO S3
+      foto_perfil
     }, { transaction: t });
 
     return usuarioCriado;
   });
 }
 
-// Função para atualizar apenas a foto de perfil (adaptada do seu outro app)
-async function atualizarFotoPerfil(usuarioId, imageBase64) {
-  return sequelize.transaction(async (t) => {
-    const usuario = await Usuario.findByPk(usuarioId, { transaction: t });
-    if (!usuario) {
-      throw new Error('Usuário não encontrado');
-    }
-
-    // Deletar foto antiga do S3 se existir
-    const oldFileUrl = usuario.foto_perfil;
-    if (oldFileUrl && oldFileUrl.includes(process.env.AWS_BUCKET_NAME)) {
-      await deleteFromS3(oldFileUrl);
-    }
-
-    // Upload da nova foto
-    const newFileUrl = await uploadToS3(imageBase64, 'usuarios/perfil');
-
-    usuario.foto_perfil = newFileUrl;
-    await usuario.save({ transaction: t });
-
-    const usuarioAtualizado = usuario.toJSON();
-    delete usuarioAtualizado.senha;
-    return usuarioAtualizado;
-  });
-}
-
-// Outras funções existentes...
 async function buscarUsuarioPorId(id) {
   return Usuario.findByPk(id, {
-    include: [{
-      model: Regra,
-      as: 'regra',
-      required: false
-    }]
+    include: [
+      {
+        model: Regra,
+        as: 'regra',
+        required: false
+      },
+      {
+        model: Usuario,
+        as: 'cdl',
+        attributes: ['usuario_id', 'nome', 'cidade', 'estado']
+      },
+      {
+        model: Usuario,
+        as: 'cdl_cliente',
+        attributes: ['usuario_id', 'nome', 'cidade', 'estado']
+      }
+    ]
   });
 }
 
 async function buscarUsuarioPorEmail(email) {
   return Usuario.findOne({ 
     where: { email },
-    include: [{
-      model: Regra,
-      as: 'regra',
-      required: false
-    }]
+    include: [
+      {
+        model: Regra,
+        as: 'regra',
+        required: false
+      },
+      {
+        model: Usuario,
+        as: 'cdl',
+        attributes: ['usuario_id', 'nome', 'cidade', 'estado']
+      }
+    ]
   });
 }
 
@@ -141,7 +131,6 @@ async function atualizarUsuario(id, dados) {
 }
 
 async function deletarUsuario(id) {
-  // Antes de deletar, remover foto do S3 se existir
   const usuario = await Usuario.findByPk(id);
   if (usuario && usuario.foto_perfil && usuario.foto_perfil.includes(process.env.AWS_BUCKET_NAME)) {
     await deleteFromS3(usuario.foto_perfil);
@@ -167,6 +156,88 @@ async function buscarUsuarioPorIdComSenha(id) {
   });
 }
 
+async function atualizarFotoPerfil(usuarioId, imageBase64) {
+  return sequelize.transaction(async (t) => {
+    const usuario = await Usuario.findByPk(usuarioId, { transaction: t });
+    if (!usuario) {
+      throw new Error('Usuário não encontrado');
+    }
+
+    const oldFileUrl = usuario.foto_perfil;
+    if (oldFileUrl && oldFileUrl.includes(process.env.AWS_BUCKET_NAME)) {
+      await deleteFromS3(oldFileUrl);
+    }
+
+    const newFileUrl = await uploadToS3(imageBase64, 'usuarios/perfil');
+
+    usuario.foto_perfil = newFileUrl;
+    await usuario.save({ transaction: t });
+
+    const usuarioAtualizado = usuario.toJSON();
+    delete usuarioAtualizado.senha;
+    return usuarioAtualizado;
+  });
+}
+
+// ==================== FUNÇÕES DE LISTAGEM COM FILTROS POR ROLE ====================
+
+async function listarUsuariosComFiltros(usuarioLogado, filtros = {}) {
+  const { role, usuario_id } = usuarioLogado;
+  let whereClause = { ...filtros };
+
+  // Aplicar filtros baseados na role
+  switch (role) {
+    case 'admin': // Cardial - vê tudo
+      break;
+      
+    case 'cdl': // CDL - vê suas lojas e seus clientes
+      whereClause[Op.or] = [
+        { role: 'empresa', empresa_pai_id: usuario_id },
+        { role: 'cliente', cdl_id: usuario_id },
+        { role: 'empresa-funcionario', empresa_pai_id: usuario_id }
+      ];
+      break;
+      
+    case 'empresa': // Loja - vê seus clientes (que compraram nela)
+      whereClause = {
+        role: 'cliente',
+        usuario_id: {
+          [Op.in]: sequelize.literal(`(
+            SELECT DISTINCT cliente_id FROM compras 
+            WHERE empresa_id = ${usuario_id} AND cliente_id IS NOT NULL
+          )`)
+        }
+      };
+      break;
+      
+    case 'cliente': // Cliente - vê lojas da sua CDL
+      const cliente = await Usuario.findByPk(usuario_id);
+      if (cliente && cliente.cdl_id) {
+        whereClause = {
+          role: 'empresa',
+          empresa_pai_id: cliente.cdl_id,
+          status: 'ativo'
+        };
+      } else {
+        whereClause = { usuario_id: -1 };
+      }
+      break;
+      
+    default:
+      whereClause = { usuario_id: -1 };
+  }
+
+  return Usuario.findAll({ 
+    where: whereClause,
+    include: [{
+      model: Regra,
+      as: 'regra',
+      required: false
+    }],
+    order: [['data_cadastro', 'DESC']]
+  });
+}
+
 async function listarUsuarios(filtros = {}) {
   return Usuario.findAll({ 
     where: filtros,
@@ -178,31 +249,141 @@ async function listarUsuarios(filtros = {}) {
   });
 }
 
-async function buscarIdsEmpresasFilhas(empresaPaiId, visitados = new Set()) {
-  if (visitados.has(empresaPaiId)) {
-    return [];
-  }
-  visitados.add(empresaPaiId);
-  
-  const idsEmpresas = [empresaPaiId];
-  
-  const empresasFilhas = await Usuario.findAll({
-    where: {
-      role: 'empresa',
-      empresa_pai_id: empresaPaiId
+// ==================== FUNÇÕES ESPECÍFICAS PARA CDL ====================
+
+async function listarCdlsAtivas() {
+  return Usuario.findAll({
+    where: { 
+      role: 'cdl',
+      status: 'ativo'
     },
-    attributes: ['usuario_id']
+    attributes: ['usuario_id', 'nome', 'cidade', 'estado', 'foto_perfil', 'telefone', 'email'],
+    order: [['nome', 'ASC']]
   });
-  
-  for (const empresaFilha of empresasFilhas) {
-    const empresasNetas = await buscarIdsEmpresasFilhas(empresaFilha.usuario_id, visitados);
-    idsEmpresas.push(...empresasNetas);
-  }
-  
-  return [...new Set(idsEmpresas)];
 }
 
-// Funções do novo repositório
+async function listarLojasPorCdl(cdl_id, apenasAtivas = true) {
+  const where = { 
+    role: 'empresa',
+    empresa_pai_id: cdl_id
+  };
+  
+  if (apenasAtivas) {
+    where.status = 'ativo';
+  }
+  
+  return Usuario.findAll({
+    where,
+    attributes: ['usuario_id', 'nome', 'telefone', 'endereco', 'foto_perfil', 'cidade', 'status'],
+    order: [['nome', 'ASC']]
+  });
+}
+
+async function buscarCdlPorId(cdl_id) {
+  return Usuario.findOne({
+    where: { 
+      usuario_id: cdl_id,
+      role: 'cdl'
+    },
+    attributes: ['usuario_id', 'nome', 'cidade', 'estado', 'foto_perfil', 'telefone', 'email', 'cnpj']
+  });
+}
+
+async function contarLojasDaCdl(cdl_id) {
+  return Usuario.count({
+    where: { 
+      role: 'empresa',
+      empresa_pai_id: cdl_id,
+      status: 'ativo'
+    }
+  });
+}
+
+async function contarClientesDaCdl(cdl_id) {
+  return Usuario.count({
+    where: { 
+      role: 'cliente',
+      cdl_id: cdl_id
+    }
+  });
+}
+
+async function getDashboardCdl(cdl_id) {
+  const [totalLojas, totalClientes, lojasRecentes] = await Promise.all([
+    contarLojasDaCdl(cdl_id),
+    contarClientesDaCdl(cdl_id),
+    Usuario.findAll({
+      where: { 
+        role: 'empresa',
+        empresa_pai_id: cdl_id
+      },
+      attributes: ['usuario_id', 'nome', 'status', 'data_cadastro', 'foto_perfil'],
+      order: [['data_cadastro', 'DESC']],
+      limit: 10
+    })
+  ]);
+  
+  return {
+    cdl_id,
+    totalLojas,
+    totalClientes,
+    lojasRecentes
+  };
+}
+
+async function trocarCdlDoCliente(cliente_id, nova_cdl_id) {
+  const cdl = await Usuario.findOne({
+    where: { 
+      usuario_id: nova_cdl_id,
+      role: 'cdl',
+      status: 'ativo'
+    }
+  });
+  
+  if (!cdl) {
+    throw new Error('CDL não encontrada ou não está ativa');
+  }
+  
+  await Usuario.update(
+    { cdl_id: nova_cdl_id },
+    { where: { usuario_id: cliente_id, role: 'cliente' } }
+  );
+  
+  return buscarUsuarioPorId(cliente_id);
+}
+
+// ==================== FUNÇÕES ADMINISTRATIVAS ====================
+
+async function tornarUsuarioAdmin(id) {
+  const usuarioExistente = await Usuario.findByPk(id);
+  if (!usuarioExistente) {
+    throw new Error('Usuário não existe');
+  }
+  await Usuario.update({ role: 'admin', status: 'ativo' }, { where: { usuario_id: id } });
+  return Usuario.findByPk(id);
+}
+
+async function tornarUsuarioCdl(id) {
+  const usuarioExistente = await Usuario.findByPk(id);
+  if (!usuarioExistente) {
+    throw new Error('Usuário não existe');
+  }
+  await Usuario.update({ role: 'cdl', status: 'pendente' }, { where: { usuario_id: id } });
+  return Usuario.findByPk(id);
+}
+
+async function aprovarCdl(id) {
+  const usuarioExistente = await Usuario.findByPk(id);
+  if (!usuarioExistente) {
+    throw new Error('CDL não existe');
+  }
+  if (usuarioExistente.role !== 'cdl') {
+    throw new Error('Usuário não é uma CDL');
+  }
+  await Usuario.update({ status: 'ativo' }, { where: { usuario_id: id } });
+  return Usuario.findByPk(id);
+}
+
 async function listarEmpresas(whereClause = {}) {
   const defaultWhere = {
     role: 'empresa',
@@ -214,55 +395,19 @@ async function listarEmpresas(whereClause = {}) {
     include: [{
       model: Regra,
       as: 'regra',
-      required: false,
-      attributes: ['regra_id', 'nome', 'tipo', 'pontos', 'multiplicador']
+      required: false
+    },
+    {
+      model: Usuario,
+      as: 'cdl',
+      attributes: ['usuario_id', 'nome', 'cidade', 'estado']
     }],
     order: [['data_cadastro', 'DESC']]
-  }).then(empresas => empresas.map(e => {
-    if (e.regra) {
-      const regra = e.regra;
-      e.dataValues.descricao_regra = regra.tipo === 'por_compra' 
-        ? `${regra.pontos} pontos por compra` 
-        : `${regra.multiplicador} pontos por real gasto`;
-    }
-    return e;
-  }));
+  });
 }
-
-async function tornarUsuarioAdmin(id) {
-  const usuarioExistente = await Usuario.findByPk(id);
-  if (!usuarioExistente) {
-    throw new Error('Usuário não existe');
-  }
-  await Usuario.update({ role: 'admin' }, { where: { usuario_id: id } });
-  return Usuario.findByPk(id);
-}
-
-async function tornarUsuarioEmpresa(id) {
-  const usuarioExistente = await Usuario.findByPk(id);
-  if (!usuarioExistente) {
-    throw new Error('Usuário não existe');
-  }
-  await Usuario.update({ role: 'empresa', status: 'pendente' }, { where: { usuario_id: id } });
-  return Usuario.findByPk(id);
-}
-
-async function aprovarEmpresa(id) {
-  const usuarioExistente = await Usuario.findByPk(id);
-  if (!usuarioExistente) {
-    throw new Error('Empresa não existe');
-  }
-  if (usuarioExistente.role !== 'empresa') {
-    throw new Error('Usuário não é uma empresa');
-  }
-  await Usuario.update({ status: 'ativo' }, { where: { usuario_id: id } });
-  return Usuario.findByPk(id);
-}
-
-const MODALIDADES_PONTUACAO = ['regras', '1pt_real_1pt_compra'];
 
 async function atualizarDadosEmpresa(usuario_id, dados) {
-  const { cnpj, endereco, telefone, modalidade_pontuacao, nome_regra, tipo, valor_minimo, pontos, multiplicador } = dados;
+  const { cnpj, endereco, telefone, cidade, estado, modalidade_pontuacao, nome_regra, tipo, valor_minimo, pontos, multiplicador } = dados;
   const usuarioExistente = await Usuario.findByPk(usuario_id, { include: [{ model: Regra, as: 'regra' }] });
   
   if (!usuarioExistente) {
@@ -272,11 +417,12 @@ async function atualizarDadosEmpresa(usuario_id, dados) {
     throw new Error('Usuário não é uma empresa');
   }
 
+  const MODALIDADES_PONTUACAO = ['regras', '1pt_real_1pt_compra'];
   if (modalidade_pontuacao !== undefined && modalidade_pontuacao !== null && !MODALIDADES_PONTUACAO.includes(modalidade_pontuacao)) {
     throw new Error('Modalidade de pontuação inválida. Use: regras ou 1pt_real_1pt_compra');
   }
 
-  const dadosBasicos = { cnpj, endereco, telefone };
+  const dadosBasicos = { cnpj, endereco, telefone, cidade, estado };
   if (modalidade_pontuacao !== undefined) {
     dadosBasicos.modalidade_pontuacao = modalidade_pontuacao;
   }
@@ -316,8 +462,32 @@ async function givePoints(id, pontos) {
   return usuarioExistente;
 }
 
+async function buscarIdsEmpresasFilhas(empresaPaiId, visitados = new Set()) {
+  if (visitados.has(empresaPaiId)) {
+    return [];
+  }
+  visitados.add(empresaPaiId);
+  
+  const idsEmpresas = [empresaPaiId];
+  
+  const empresasFilhas = await Usuario.findAll({
+    where: {
+      role: 'empresa',
+      empresa_pai_id: empresaPaiId
+    },
+    attributes: ['usuario_id']
+  });
+  
+  for (const empresaFilha of empresasFilhas) {
+    const empresasNetas = await buscarIdsEmpresasFilhas(empresaFilha.usuario_id, visitados);
+    idsEmpresas.push(...empresasNetas);
+  }
+  
+  return [...new Set(idsEmpresas)];
+}
+
 module.exports = {
-  // Funções antigas
+  // Funções básicas
   criarUsuario,
   buscarUsuarioPorId,
   buscarUsuarioPorEmail,
@@ -325,14 +495,25 @@ module.exports = {
   deletarUsuario,
   atualizarPerfil,
   buscarUsuarioPorIdComSenha,
-  atualizarFotoPerfil, // AGORA ESTÁ FUNCIONAL
+  atualizarFotoPerfil,
   listarUsuarios,
+  listarUsuariosComFiltros,
   buscarIdsEmpresasFilhas,
-  // Funções novas
+  
+  // Funções específicas CDL
+  listarCdlsAtivas,
+  listarLojasPorCdl,
+  buscarCdlPorId,
+  contarLojasDaCdl,
+  contarClientesDaCdl,
+  getDashboardCdl,
+  trocarCdlDoCliente,
+  
+  // Funções administrativas
   listarEmpresas,
   tornarUsuarioAdmin,
-  tornarUsuarioEmpresa,
-  aprovarEmpresa,
+  tornarUsuarioCdl,
+  aprovarCdl,
   atualizarDadosEmpresa,
   givePoints,
 };

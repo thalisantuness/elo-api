@@ -1,6 +1,6 @@
 const compraRepository = require('../repositories/compraRepository');
 const { Usuario } = require('../model/Usuarios');
-const { generateQRCode } = require('../utils/qrCodeGenerator');
+const { generateQRCode } = require('../services/qrCodeService');
 
 function ComprasController() {
   async function listarCompras(req, res) {

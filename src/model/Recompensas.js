@@ -1,5 +1,6 @@
 const { Sequelize } = require("sequelize");
 const sequelize = require("../utils/db");
+const { Usuario } = require("./Usuarios");
 
 const Recompensas = sequelize.define('recompensas', {
   recom_id: {
@@ -24,7 +25,7 @@ const Recompensas = sequelize.define('recompensas', {
     allowNull: true,
   },
   imagem_url: {
-    type: Sequelize.TEXT,  // URL da imagem no S3 (igual foto_perfil do usuário)
+    type: Sequelize.TEXT,
     allowNull: true,
   },
   pontos: {
@@ -53,5 +54,8 @@ const Recompensas = sequelize.define('recompensas', {
   tableName: 'recompensas',
   timestamps: false
 });
+
+// Associação com Usuário (dono da recompensa)
+Recompensas.belongsTo(Usuario, { foreignKey: 'usuario_id', as: 'usuario' });
 
 module.exports = { Recompensas };

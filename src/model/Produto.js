@@ -10,7 +10,7 @@ const Produto = sequelize.define(
       primaryKey: true,
       autoIncrement: true,
     },
-        empresa_id: {
+    empresa_id: {
       type: Sequelize.INTEGER,
       allowNull: false,
       references: {
@@ -42,7 +42,6 @@ const Produto = sequelize.define(
       type: Sequelize.STRING,
       allowNull: false,
     },
-
     empresas_autorizadas: {
       type: Sequelize.ARRAY(Sequelize.INTEGER),
       allowNull: true,

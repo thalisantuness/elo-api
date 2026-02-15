@@ -23,11 +23,16 @@ const Campanha = sequelize.define('campanhas', {
     allowNull: true,
   },
   imagem_url: {
-    type: Sequelize.TEXT,  // MUDADO DE STRING(255) PARA TEXT (igual foto_perfil do usuário)
+    type: Sequelize.TEXT,
     allowNull: true,
   },
+  produtos: {
+    type: Sequelize.ARRAY(Sequelize.INTEGER), // Array de IDs de produtos
+    allowNull: true,
+    defaultValue: [],
+  },
   recompensas: {
-    type: Sequelize.ARRAY(Sequelize.INTEGER),
+    type: Sequelize.ARRAY(Sequelize.INTEGER), // Array de IDs de recompensas
     allowNull: true,
     defaultValue: [],
   },

@@ -5,29 +5,38 @@ const authConfig = require("../config/auth.json");
 const { Op } = require("sequelize");
 
 function UsuarioController() {
-  // ==================== FUNÇÕES DO SISTEMA ANTIGO ====================
+  // ==================== FUNÇÕES BÁSICAS ====================
 
   async function cadastrar(req, res) {
     try {
-      const { nome, telefone, email, senha, role, foto_perfil, cliente_endereco, empresa_pai_id } = req.body;
+      const { 
+        nome, telefone, email, senha, role, foto_perfil, 
+        cliente_endereco, empresa_pai_id, cdl_id, cidade, estado,
+        cnpj, endereco 
+      } = req.body;
 
+      // Validações básicas
       if (!nome || !email || !senha || !role) {
         return res.status(400).json({ 
           error: "Nome, email, senha e role são obrigatórios" 
         });
       }
 
-      if (!["cliente", "empresa", "admin", "empresa-funcionario"].includes(role)) {
+      // Validar role
+      const rolesPermitidas = ["cliente", "empresa", "admin", "cdl", "empresa-funcionario"];
+      if (!rolesPermitidas.includes(role)) {
         return res.status(400).json({ 
-          error: "Role inválido. Use 'cliente', 'empresa', 'admin' ou 'empresa-funcionario'." 
+          error: "Role inválido. Use: cliente, empresa, admin, cdl ou empresa-funcionario" 
         });
       }
 
+      // Verificar email duplicado
       const usuarioExistente = await usuariosRepository.buscarUsuarioPorEmail(email);
       if (usuarioExistente) {
         return res.status(400).json({ error: "Email já cadastrado" });
       }
 
+      // Validar telefone
       if (telefone) {
         const telefoneLimpo = telefone.replace(/\D/g, '');
         if (!/^\d{10,11}$/.test(telefoneLimpo)) {
@@ -37,6 +46,7 @@ function UsuarioController() {
         }
       }
 
+      // Validar foto
       if (foto_perfil) {
         if (!foto_perfil.startsWith('data:image')) {
           return res.status(400).json({ 
@@ -48,12 +58,32 @@ function UsuarioController() {
         }
       }
 
+      // Lógica de vínculos baseada na role
       let empresaPaiIdFinal = empresa_pai_id || null;
-      if (req.user && req.user.role === 'empresa') {
-        if (role === 'empresa-funcionario' || role === 'cliente' || role === 'empresa') {
-          empresaPaiIdFinal = req.user.usuario_id;
-        }
+      let cdlIdFinal = cdl_id || null;
+
+      // Se for admin criando CDL
+      if (req.user && req.user.role === 'admin' && role === 'cdl') {
+        // Admin pode criar CDL sem vínculo
       }
+      
+      // Se for CDL criando loja
+      else if (req.user && req.user.role === 'cdl' && role === 'empresa') {
+        empresaPaiIdFinal = req.user.usuario_id;
+        cdlIdFinal = req.user.usuario_id; // A loja também fica vinculada à CDL
+      }
+      
+      // Se for cliente se cadastrando
+      else if (role === 'cliente' && !cdl_id) {
+        return res.status(400).json({ 
+          error: "Cliente deve informar cdl_id (CDL da sua cidade)" 
+        });
+      }
+
+      // Status baseado na role
+      let status = 'ativo';
+      if (role === 'empresa') status = 'pendente';
+      if (role === 'cdl') status = 'pendente';
 
       const usuarioCriado = await usuariosRepository.criarUsuario({
         usuario: {
@@ -63,9 +93,14 @@ function UsuarioController() {
           senha,
           role,
           cliente_endereco: cliente_endereco || null,
+          endereco: endereco || null,
+          cidade: cidade || null,
+          estado: estado || null,
           empresa_pai_id: empresaPaiIdFinal,
-          status: role === 'empresa' ? 'pendente' : 'ativo',
-          pontos: 0
+          cdl_id: cdlIdFinal,
+          status,
+          pontos: 0,
+          cnpj: cnpj || null
         },
         fotoPerfilBase64: foto_perfil
       });
@@ -99,6 +134,11 @@ function UsuarioController() {
         return res.status(404).json({ error: "Usuário não encontrado" });
       }
 
+      // Verificar status
+      if (usuario.status === 'bloqueado') {
+        return res.status(403).json({ error: "Usuário bloqueado" });
+      }
+
       const senhaValida = await bcrypt.compare(senha, usuario.senha);
       if (!senhaValida) {
         return res.status(401).json({ error: "Senha incorreta" });
@@ -108,7 +148,8 @@ function UsuarioController() {
         {
           usuario_id: usuario.usuario_id,
           role: usuario.role,
-          email: usuario.email
+          email: usuario.email,
+          cdl_id: usuario.cdl_id || usuario.empresa_pai_id || null
         },
         authConfig.secret,
         { expiresIn: "24h" }
@@ -124,6 +165,9 @@ function UsuarioController() {
           foto_perfil: usuario.foto_perfil,
           pontos: usuario.pontos,
           status: usuario.status,
+          cidade: usuario.cidade,
+          estado: usuario.estado,
+          cdl_id: usuario.cdl_id,
           empresa_pai_id: usuario.empresa_pai_id || null
         },
         token
@@ -138,47 +182,8 @@ function UsuarioController() {
 
   async function listar(req, res) {
     try {
-      const { role: userRole } = req.user;
-      let whereClause = {
-        usuario_id: { [Op.ne]: req.user.usuario_id }
-      };
-
-      switch (userRole) {
-        case 'admin':
-          console.log('Admin logado - mostrando todos os usuários');
-          break;
-          
-        case 'empresa':
-          whereClause[Op.or] = [
-            { role: 'empresa-funcionario', empresa_pai_id: req.user.usuario_id },
-            { role: 'empresa', empresa_pai_id: req.user.usuario_id },
-            { role: 'cliente' }
-          ];
-          break;
-          
-        case 'empresa-funcionario':
-          const funcionario = await usuariosRepository.buscarUsuarioPorId(req.user.usuario_id);
-          if (funcionario && funcionario.empresa_pai_id) {
-            whereClause[Op.or] = [
-              { role: 'empresa-funcionario', empresa_pai_id: funcionario.empresa_pai_id },
-              { role: 'empresa', empresa_pai_id: funcionario.empresa_pai_id },
-              { role: 'cliente' }
-            ];
-          } else {
-            whereClause.usuario_id = { [Op.eq]: -1 };
-          }
-          break;
-          
-        case 'cliente':
-          whereClause.role = 'empresa';
-          break;
-          
-        default:
-          return res.status(403).json({ error: 'Role não autorizado' });
-      }
-
-      const usuarios = await usuariosRepository.listarUsuarios(whereClause);
-
+      const usuarios = await usuariosRepository.listarUsuariosComFiltros(req.user);
+      
       res.json(usuarios.map((u) => {
         const usuario = u.toJSON();
         delete usuario.senha;
@@ -209,64 +214,25 @@ function UsuarioController() {
     }
   }
 
-  async function atualizar(req, res) {
-    try {
-      const { id } = req.params;
-      const dadosAtualizacao = req.body;
-
-      delete dadosAtualizacao.senha;
-      delete dadosAtualizacao.usuario_id;
-      delete dadosAtualizacao.role;
-      delete dadosAtualizacao.foto_perfil;
-      delete dadosAtualizacao.pontos;
-      delete dadosAtualizacao.status;
-
-      if (dadosAtualizacao.telefone) {
-        const telefoneLimpo = dadosAtualizacao.telefone.replace(/\D/g, '');
-        if (!/^\d{10,11}$/.test(telefoneLimpo)) {
-          return res.status(400).json({ 
-            error: "Telefone inválido. Use apenas números (10 ou 11 dígitos)." 
-          });
-        }
-        dadosAtualizacao.telefone = telefoneLimpo;
-      }
-
-      const [updated] = await usuariosRepository.atualizarUsuario(id, dadosAtualizacao);
-
-      if (!updated) {
-        return res.status(404).json({ error: "Usuário não encontrado" });
-      }
-
-      const usuarioAtualizado = await usuariosRepository.buscarUsuarioPorId(id);
-      const usuarioRetorno = usuarioAtualizado.toJSON();
-      delete usuarioRetorno.senha;
-
-      res.json({
-        message: "Usuário atualizado com sucesso",
-        usuario: usuarioRetorno
-      });
-    } catch (error) {
-      console.error("Erro ao atualizar usuário:", error);
-      res.status(500).json({ error: "Erro ao atualizar usuário" });
-    }
-  }
-
   async function atualizarPerfil(req, res) {
     try {
       const { id } = req.params;
       const dadosAtualizacao = req.body;
       const usuarioLogadoId = req.user.usuario_id;
 
-      if (parseInt(id, 10) !== usuarioLogadoId) {
+      if (parseInt(id, 10) !== usuarioLogadoId && req.user.role !== 'admin') {
         return res.status(403).json({ error: "Não autorizado a editar este perfil." });
       }
 
+      // Campos que não podem ser alterados diretamente
       delete dadosAtualizacao.senha;
       delete dadosAtualizacao.role;
       delete dadosAtualizacao.usuario_id;
       delete dadosAtualizacao.foto_perfil;
       delete dadosAtualizacao.pontos;
       delete dadosAtualizacao.status;
+      delete dadosAtualizacao.cdl_id;
+      delete dadosAtualizacao.empresa_pai_id;
 
       if (dadosAtualizacao.telefone) {
         const telefoneLimpo = dadosAtualizacao.telefone.replace(/\D/g, '');
@@ -376,6 +342,12 @@ function UsuarioController() {
   async function deletar(req, res) {
     try {
       const { id } = req.params;
+      
+      // Apenas admin pode deletar usuários
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: "Apenas administradores podem excluir usuários" });
+      }
+      
       const deletado = await usuariosRepository.deletarUsuario(id);
 
       if (!deletado) {
@@ -389,7 +361,86 @@ function UsuarioController() {
     }
   }
 
-  // ==================== FUNÇÕES DO NOVO SISTEMA ====================
+  // ==================== FUNÇÕES ESPECÍFICAS CDL ====================
+
+  async function listarCdls(req, res) {
+    try {
+      const cdls = await usuariosRepository.listarCdlsAtivas();
+      res.json(cdls);
+    } catch (error) {
+      console.error('Erro ao listar CDLs:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async function listarLojasDaCdl(req, res) {
+    try {
+      const { cdl_id } = req.params;
+      
+      const cdl = await usuariosRepository.buscarCdlPorId(cdl_id);
+      if (!cdl) {
+        return res.status(404).json({ error: 'CDL não encontrada' });
+      }
+      
+      const lojas = await usuariosRepository.listarLojasPorCdl(cdl_id);
+      res.json({
+        cdl: {
+          id: cdl.usuario_id,
+          nome: cdl.nome,
+          cidade: cdl.cidade,
+          estado: cdl.estado
+        },
+        lojas
+      });
+    } catch (error) {
+      console.error('Erro ao listar lojas da CDL:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async function getDashboardCdl(req, res) {
+    try {
+      if (req.user.role !== 'cdl' && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Apenas CDLs e administradores podem acessar' });
+      }
+      
+      const cdl_id = req.user.role === 'admin' && req.params.cdl_id 
+        ? req.params.cdl_id 
+        : req.user.usuario_id;
+      
+      const dashboard = await usuariosRepository.getDashboardCdl(cdl_id);
+      res.json(dashboard);
+    } catch (error) {
+      console.error('Erro ao carregar dashboard da CDL:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  async function trocarCdlDoCliente(req, res) {
+    try {
+      const { id } = req.params;
+      const { nova_cdl_id } = req.body;
+      
+      if (req.user.role !== 'cliente' || req.user.usuario_id !== parseInt(id)) {
+        return res.status(403).json({ error: 'Não autorizado' });
+      }
+      
+      const clienteAtualizado = await usuariosRepository.trocarCdlDoCliente(id, nova_cdl_id);
+      
+      const clienteRetorno = clienteAtualizado.toJSON();
+      delete clienteRetorno.senha;
+      
+      res.json({ 
+        message: 'CDL alterada com sucesso',
+        usuario: clienteRetorno 
+      });
+    } catch (error) {
+      console.error('Erro ao trocar CDL do cliente:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  // ==================== FUNÇÕES ADMINISTRATIVAS ====================
 
   async function visualizarUsuario(req, res) {
     try {
@@ -425,42 +476,42 @@ function UsuarioController() {
     }
   }
 
-  async function tornarEmpresa(req, res) {
+  async function tornarCdl(req, res) {
     const { id } = req.body;
     const { role } = req.user;
     if (role !== 'admin') {
-      return res.status(403).json({ error: 'Apenas administradores podem tornar usuários em empresas' });
+      return res.status(403).json({ error: 'Apenas administradores podem criar CDLs' });
     }
     try {
-      const usuarioAtualizado = await usuariosRepository.tornarUsuarioEmpresa(id);
+      const usuarioAtualizado = await usuariosRepository.tornarUsuarioCdl(id);
       const usuarioRetorno = usuarioAtualizado.toJSON();
       delete usuarioRetorno.senha;
       res.json({
-        message: `Usuário com ID ${id} agora é uma empresa`,
+        message: `Usuário com ID ${id} agora é uma CDL (pendente aprovação)`,
         usuario: usuarioRetorno
       });
     } catch (error) {
-      console.error('Erro ao atualizar usuário para empresa:', error);
+      console.error('Erro ao atualizar usuário para CDL:', error);
       res.status(500).json({ error: error.message });
     }
   }
 
-  async function aprovarEmpresa(req, res) {
+  async function aprovarCdl(req, res) {
     const { id } = req.params;
     const { role } = req.user;
     if (role !== 'admin') {
-      return res.status(403).json({ error: 'Apenas administradores podem aprovar empresas' });
+      return res.status(403).json({ error: 'Apenas administradores podem aprovar CDLs' });
     }
     try {
-      const usuarioAtualizado = await usuariosRepository.aprovarEmpresa(id);
+      const usuarioAtualizado = await usuariosRepository.aprovarCdl(id);
       const usuarioRetorno = usuarioAtualizado.toJSON();
       delete usuarioRetorno.senha;
       res.json({
-        message: `Empresa com ID ${id} aprovada com sucesso`,
+        message: `CDL com ID ${id} aprovada com sucesso`,
         usuario: usuarioRetorno
       });
     } catch (error) {
-      console.error('Erro ao aprovar empresa:', error);
+      console.error('Erro ao aprovar CDL:', error);
       res.status(500).json({ error: error.message });
     }
   }
@@ -468,9 +519,14 @@ function UsuarioController() {
   async function listarEmpresas(req, res) {
     try {
       let where = { role: 'empresa', status: 'ativo' };
-      if (req.user.role === 'empresa') {
+      
+      // Se for CDL, filtrar por suas lojas
+      if (req.user.role === 'cdl') {
+        where.empresa_pai_id = req.user.usuario_id;
+      } else if (req.user.role === 'empresa') {
         where.usuario_id = { [Op.ne]: req.user.usuario_id };
       }
+      
       const empresas = await usuariosRepository.listarEmpresas(where);
       res.json(empresas.map(e => {
         const empresa = e.toJSON();
@@ -526,22 +582,27 @@ function UsuarioController() {
 
   // ==================== RETORNO DO CONTROLLER ====================
   return {
-    // Funções do sistema antigo
+    // Funções básicas
     cadastrar,
     logar,
     listar,
     buscarPorId,
-    atualizar,
     atualizarPerfil,
     alterarSenha,
     atualizarFotoPerfil,
     deletar,
     
-    // Funções do novo sistema
+    // Funções CDL
+    listarCdls,
+    listarLojasDaCdl,
+    getDashboardCdl,
+    trocarCdlDoCliente,
+    
+    // Funções administrativas
     visualizarUsuario,
     tornarAdmin,
-    tornarEmpresa,
-    aprovarEmpresa,
+    tornarCdl,
+    aprovarCdl,
     listarEmpresas,
     atualizarDadosEmpresa,
     givePoints,

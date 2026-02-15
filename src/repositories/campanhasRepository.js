@@ -5,7 +5,7 @@ const s3 = require("../utils/awsConfig");
 const { v4: uuidv4 } = require("uuid");
 const sharp = require("sharp");
 
-// ==================== FUNÇÕES DE UPLOAD (IGUAL AO USUÁRIO) ====================
+// ==================== FUNÇÕES DE UPLOAD ====================
 
 async function deleteFromS3(fileUrl) {
   if (!fileUrl || !fileUrl.includes(process.env.AWS_BUCKET_NAME)) {
@@ -24,7 +24,6 @@ async function deleteFromS3(fileUrl) {
   }
 }
 
-// Helper para fazer upload de uma nova imagem para o S3
 async function uploadToS3(base64Image, folder) {
   if (!base64Image || !base64Image.startsWith('data:image')) {
     throw new Error('Formato de imagem Base64 inválido');
@@ -32,7 +31,7 @@ async function uploadToS3(base64Image, folder) {
   try {
     const buffer = Buffer.from(base64Image.split(',')[1], 'base64');
     const compressedBuffer = await sharp(buffer)
-      .resize(1200, 630, { fit: 'inside', withoutEnlargement: true }) // Tamanho bom para banners
+      .resize(1200, 630, { fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 85 })
       .toBuffer();
 
@@ -56,7 +55,7 @@ async function uploadToS3(base64Image, folder) {
 // ==================== FUNÇÕES DE CAMPANHA ====================
 
 async function criar(dados) {
-  const { empresa_id, titulo, descricao, imagem_base64, recompensas, data_inicio, data_fim, ativa } = dados;
+  const { empresa_id, titulo, descricao, imagem_base64, produtos, recompensas, data_inicio, data_fim, ativa } = dados;
   
   if (!titulo || !data_inicio || !data_fim) {
     throw new Error('titulo, data_inicio e data_fim são obrigatórios');
@@ -65,7 +64,6 @@ async function criar(dados) {
   return sequelize.transaction(async (t) => {
     let imagem_url = null;
     
-    // Fazer upload da imagem se fornecida (igual ao usuário)
     if (imagem_base64 && imagem_base64.startsWith('data:image')) {
       try {
         imagem_url = await uploadToS3(imagem_base64, 'campanhas');
@@ -81,6 +79,7 @@ async function criar(dados) {
       titulo,
       descricao: descricao || null,
       imagem_url,
+      produtos: Array.isArray(produtos) ? produtos : [],
       recompensas: Array.isArray(recompensas) ? recompensas : [],
       data_inicio,
       data_fim,
@@ -103,7 +102,25 @@ async function listarTodas() {
     include: [{
       model: Usuario,
       as: 'empresa',
-      attributes: ['usuario_id', 'nome', 'email', 'foto_perfil'],
+      attributes: ['usuario_id', 'nome', 'email', 'foto_perfil', 'cidade', 'estado'],
+    }],
+    order: [['data_cadastro', 'DESC']],
+  });
+}
+
+async function listarPorCdl(cdl_id) {
+  // Busca campanhas de todas as lojas da CDL e da própria CDL
+  return Campanha.findAll({
+    include: [{
+      model: Usuario,
+      as: 'empresa',
+      where: {
+        [Op.or]: [
+          { usuario_id: cdl_id }, // A própria CDL
+          { empresa_pai_id: cdl_id } // Lojas da CDL
+        ]
+      },
+      attributes: ['usuario_id', 'nome', 'role'],
     }],
     order: [['data_cadastro', 'DESC']],
   });
@@ -114,7 +131,7 @@ async function buscarPorId(id) {
     include: [{
       model: Usuario,
       as: 'empresa',
-      attributes: ['usuario_id', 'nome', 'email', 'foto_perfil'],
+      attributes: ['usuario_id', 'nome', 'email', 'foto_perfil', 'role', 'cidade', 'estado'],
     }],
   });
   
@@ -126,7 +143,7 @@ async function buscarPorId(id) {
 }
 
 async function atualizar(id, dados) {
-  const { titulo, descricao, imagem_base64, recompensas, data_inicio, data_fim, ativa } = dados;
+  const { titulo, descricao, imagem_base64, produtos, recompensas, data_inicio, data_fim, ativa } = dados;
   
   return sequelize.transaction(async (t) => {
     const campanha = await Campanha.findByPk(id, { transaction: t });
@@ -139,22 +156,18 @@ async function atualizar(id, dados) {
     
     if (titulo !== undefined) atualizacao.titulo = titulo;
     if (descricao !== undefined) atualizacao.descricao = descricao;
+    if (produtos !== undefined) atualizacao.produtos = Array.isArray(produtos) ? produtos : campanha.produtos;
     if (recompensas !== undefined) atualizacao.recompensas = Array.isArray(recompensas) ? recompensas : campanha.recompensas;
     if (data_inicio !== undefined) atualizacao.data_inicio = data_inicio;
     if (data_fim !== undefined) atualizacao.data_fim = data_fim;
     if (ativa !== undefined) atualizacao.ativa = ativa;
     
-    // Processar nova imagem se fornecida (igual ao usuário)
     if (imagem_base64 && imagem_base64.startsWith('data:image')) {
-      // Deletar imagem antiga do S3 se existir
       if (campanha.imagem_url && campanha.imagem_url.includes(process.env.AWS_BUCKET_NAME)) {
         await deleteFromS3(campanha.imagem_url);
       }
-      
-      // Upload da nova imagem
       atualizacao.imagem_url = await uploadToS3(imagem_base64, 'campanhas');
     } else if (imagem_base64 === null) {
-      // Se enviar null, deletar imagem antiga
       if (campanha.imagem_url && campanha.imagem_url.includes(process.env.AWS_BUCKET_NAME)) {
         await deleteFromS3(campanha.imagem_url);
       }
@@ -178,7 +191,6 @@ async function excluir(id) {
       throw new Error(`Campanha com ID ${id} não encontrada`);
     }
     
-    // Deletar imagem do S3 se existir (igual ao usuário)
     if (campanha.imagem_url && campanha.imagem_url.includes(process.env.AWS_BUCKET_NAME)) {
       await deleteFromS3(campanha.imagem_url);
     }
@@ -196,6 +208,7 @@ module.exports = {
   criar,
   listarPorEmpresa,
   listarTodas,
+  listarPorCdl,
   buscarPorId,
   atualizar,
   excluir,
