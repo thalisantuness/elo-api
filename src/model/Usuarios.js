@@ -10,16 +10,7 @@ const Usuario = sequelize.define(
       primaryKey: true,
       autoIncrement: true,
     },
-    // Para lojas: ID da CDL (empresa_pai_id)
-    empresa_pai_id: {
-      type: Sequelize.INTEGER,
-      allowNull: true,
-      references: {
-        model: "usuarios",
-        key: "usuario_id",
-      },
-    },
-    // Para clientes: ID da CDL escolhida
+    // Campo único para vincular qualquer usuário (loja ou cliente) à CDL
     cdl_id: {
       type: Sequelize.INTEGER,
       allowNull: true,
@@ -109,7 +100,6 @@ const Usuario = sequelize.define(
     indexes: [
       { fields: ['regra_id'] },
       { fields: ['cdl_id'] },
-      { fields: ['empresa_pai_id'] },
       { fields: ['role'] },
       { fields: ['cidade', 'estado'] }
     ]
@@ -121,26 +111,15 @@ Usuario.belongsTo(Regra, {
   as: 'regra'
 });
 
-// Auto-relacionamento para CDL -> Lojas
+// Auto-relacionamento para CDL -> Lojas/Clientes
 Usuario.belongsTo(Usuario, {
-  foreignKey: 'empresa_pai_id',
+  foreignKey: 'cdl_id',
   as: 'cdl'
 });
 
 Usuario.hasMany(Usuario, {
-  foreignKey: 'empresa_pai_id',
-  as: 'lojas'
-});
-
-// Auto-relacionamento para Cliente -> CDL
-Usuario.belongsTo(Usuario, {
   foreignKey: 'cdl_id',
-  as: 'cdl_cliente'
-});
-
-Usuario.hasMany(Usuario, {
-  foreignKey: 'cdl_id',
-  as: 'clientes_cdl'
+  as: 'membros'
 });
 
 module.exports = { Usuario };

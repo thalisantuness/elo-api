@@ -1,6 +1,5 @@
 const { Compra } = require('../model/Compra');
 const { Usuario } = require('../model/Usuarios');
-const { Regra } = require('../model/Regra');
 const { Campanha } = require('../model/Campanha');
 const { Op } = require('sequelize');
 const sequelize = require('../utils/db');
@@ -114,44 +113,17 @@ async function criarCompra(dadosCompra) {
   const empresa = await Usuario.findOne({
     where: {
       usuario_id: empresa_id,
-      role: 'empresa',
+      role: { [Op.in]: ['empresa', 'cdl', 'admin'] },
       status: 'ativo'
     }
   });
   
   if (!empresa) {
-    throw new Error('Empresa não encontrada ou não está ativa');
+    throw new Error('Empresa/CDL não encontrada ou não está ativa');
   }
   
-  // Se cliente_id fornecido, verificar cliente
-  if (cliente_id) {
-    const cliente = await Usuario.findByPk(cliente_id);
-    if (!cliente) {
-      throw new Error('Cliente não encontrado');
-    }
-    if (cliente.role !== 'cliente') {
-      throw new Error('Usuário não é um cliente válido');
-    }
-  }
-  
-  // Se campanha_id fornecido, verificar campanha
-  if (campanha_id) {
-    const campanha = await Campanha.findOne({
-      where: {
-        campanha_id,
-        empresa_id,
-        ativa: true,
-        data_inicio: { [Op.lte]: new Date() },
-        data_fim: { [Op.gte]: new Date() }
-      }
-    });
-    if (!campanha) {
-      throw new Error('Campanha não encontrada, não pertence à empresa ou não está ativa no período');
-    }
-  }
-  
-  // Calcular pontos
-  const pontos = await calcularPontos(empresa_id, valor, campanha_id);
+  // REGRA SIMPLIFICADA: 1 ponto por real gasto (arredondado para baixo)
+  const pontos = Math.floor(Number(valor));
   
   // Gerar ID único para o QR Code
   const qr_code_id = crypto.randomBytes(16).toString('hex');
@@ -182,44 +154,6 @@ async function criarCompra(dadosCompra) {
   return compra;
 }
 
-async function calcularPontos(empresa_id, valor, campanha_id = null) {
-  let pontos = 0;
-  
-  // Buscar empresa para ver modalidade
-  const empresa = await Usuario.findByPk(empresa_id);
-  
-  if (empresa.modalidade_pontuacao === '1pt_real_1pt_compra') {
-    pontos = Math.floor(Number(valor)) + 1;
-  } else {
-    // Buscar regras ativas da empresa
-    const regras = await Regra.findAll({
-      where: {
-        empresa_id,
-        ativa: true
-      }
-    });
-    
-    for (const regra of regras) {
-      if (regra.tipo === 'por_compra') {
-        pontos += regra.pontos;
-      } else if (regra.tipo === 'por_valor' && valor >= regra.valor_minimo) {
-        pontos += Math.floor(valor * regra.multiplicador);
-      }
-    }
-  }
-  
-  // Se tiver campanha, verificar se há bônus
-  if (campanha_id) {
-    const campanha = await Campanha.findByPk(campanha_id);
-    if (campanha && campanha.recompensas && campanha.recompensas.length > 0) {
-      // Lógica de bônus da campanha (pode ser personalizada)
-      pontos += Math.floor(pontos * 0.1); // Exemplo: 10% de bônus
-    }
-  }
-  
-  return pontos;
-}
-
 async function claimCompra(qr_code_data, cliente_id) {
   const transaction = await sequelize.transaction();
   
@@ -227,6 +161,7 @@ async function claimCompra(qr_code_data, cliente_id) {
     const dados = JSON.parse(qr_code_data);
     const { qr_code_id, valor, empresa_id } = dados;
 
+    // Verificar se o QR Code expirou
     if (Date.now() > dados.expiresAt) {
       throw new Error('QR Code expirado');
     }
@@ -251,9 +186,17 @@ async function claimCompra(qr_code_data, cliente_id) {
     }
     
     // Verificar se o cliente existe
-    const cliente = await Usuario.findByPk(cliente_id, { transaction });
-    if (!cliente || cliente.role !== 'cliente') {
-      throw new Error('Cliente inválido');
+    const cliente = await Usuario.findOne({
+      where: {
+        usuario_id: cliente_id,
+        role: 'cliente',
+        status: 'ativo'
+      },
+      transaction
+    });
+    
+    if (!cliente) {
+      throw new Error('Cliente inválido ou não encontrado');
     }
     
     // Claim: Associar cliente e validar
@@ -263,8 +206,9 @@ async function claimCompra(qr_code_data, cliente_id) {
     compra.validado_por = cliente_id;
     await compra.save({ transaction });
     
-    // Adicionar pontos ao cliente
-    cliente.pontos += compra.pontos_adquiridos;
+    // Adicionar pontos ao cliente (regra padrão: 1 ponto por real)
+    const pontosGanhos = compra.pontos_adquiridos;
+    cliente.pontos += pontosGanhos;
     await cliente.save({ transaction });
     
     await transaction.commit();
@@ -275,7 +219,7 @@ async function claimCompra(qr_code_data, cliente_id) {
       compra: {
         compra_id: compra.compra_id,
         valor: compra.valor,
-        pontos_adquiridos: compra.pontos_adquiridos,
+        pontos_adquiridos: pontosGanhos,
         cliente_novo_saldo: cliente.pontos
       }
     };
@@ -374,6 +318,5 @@ module.exports = {
   claimCompra,
   atualizarCompra,
   excluirCompra,
-  estatisticasEmpresa,
-  calcularPontos
+  estatisticasEmpresa
 };

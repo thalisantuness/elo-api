@@ -11,18 +11,15 @@ function UsuarioController() {
     try {
       const { 
         nome, telefone, email, senha, role, foto_perfil, 
-        cliente_endereco, empresa_pai_id, cdl_id, cidade, estado,
-        cnpj, endereco 
+        cliente_endereco, cdl_id, cidade, estado, cnpj
       } = req.body;
 
-      // Validações básicas
       if (!nome || !email || !senha || !role) {
         return res.status(400).json({ 
           error: "Nome, email, senha e role são obrigatórios" 
         });
       }
 
-      // Validar role
       const rolesPermitidas = ["cliente", "empresa", "admin", "cdl", "empresa-funcionario"];
       if (!rolesPermitidas.includes(role)) {
         return res.status(400).json({ 
@@ -30,13 +27,11 @@ function UsuarioController() {
         });
       }
 
-      // Verificar email duplicado
       const usuarioExistente = await usuariosRepository.buscarUsuarioPorEmail(email);
       if (usuarioExistente) {
         return res.status(400).json({ error: "Email já cadastrado" });
       }
 
-      // Validar telefone
       if (telefone) {
         const telefoneLimpo = telefone.replace(/\D/g, '');
         if (!/^\d{10,11}$/.test(telefoneLimpo)) {
@@ -46,7 +41,6 @@ function UsuarioController() {
         }
       }
 
-      // Validar foto
       if (foto_perfil) {
         if (!foto_perfil.startsWith('data:image')) {
           return res.status(400).json({ 
@@ -58,32 +52,27 @@ function UsuarioController() {
         }
       }
 
-      // Lógica de vínculos baseada na role
-      let empresaPaiIdFinal = empresa_pai_id || null;
       let cdlIdFinal = cdl_id || null;
 
-      // Se for admin criando CDL
-      if (req.user && req.user.role === 'admin' && role === 'cdl') {
-        // Admin pode criar CDL sem vínculo
+      if (req.user && req.user.role === 'cdl' && role === 'empresa') {
+        cdlIdFinal = req.user.usuario_id;
       }
       
-      // Se for CDL criando loja
-      else if (req.user && req.user.role === 'cdl' && role === 'empresa') {
-        empresaPaiIdFinal = req.user.usuario_id;
-        cdlIdFinal = req.user.usuario_id; // A loja também fica vinculada à CDL
-      }
-      
-      // Se for cliente se cadastrando
       else if (role === 'cliente' && !cdl_id) {
         return res.status(400).json({ 
           error: "Cliente deve informar cdl_id (CDL da sua cidade)" 
         });
       }
 
-      // Status baseado na role
+      else if (role === 'empresa' && !cdl_id && (!req.user || req.user.role !== 'cdl')) {
+        return res.status(400).json({ 
+          error: "Empresa deve informar cdl_id ou ser criada por uma CDL" 
+        });
+      }
+
       let status = 'ativo';
-      if (role === 'empresa') status = 'pendente';
-      if (role === 'cdl') status = 'pendente';
+    //   if (role === 'empresa') status = 'pendente';
+    //   if (role === 'cdl') status = 'pendente';
 
       const usuarioCriado = await usuariosRepository.criarUsuario({
         usuario: {
@@ -93,10 +82,8 @@ function UsuarioController() {
           senha,
           role,
           cliente_endereco: cliente_endereco || null,
-          endereco: endereco || null,
           cidade: cidade || null,
           estado: estado || null,
-          empresa_pai_id: empresaPaiIdFinal,
           cdl_id: cdlIdFinal,
           status,
           pontos: 0,
@@ -134,7 +121,6 @@ function UsuarioController() {
         return res.status(404).json({ error: "Usuário não encontrado" });
       }
 
-      // Verificar status
       if (usuario.status === 'bloqueado') {
         return res.status(403).json({ error: "Usuário bloqueado" });
       }
@@ -149,7 +135,7 @@ function UsuarioController() {
           usuario_id: usuario.usuario_id,
           role: usuario.role,
           email: usuario.email,
-          cdl_id: usuario.cdl_id || usuario.empresa_pai_id || null
+          cdl_id: usuario.cdl_id
         },
         authConfig.secret,
         { expiresIn: "24h" }
@@ -167,8 +153,7 @@ function UsuarioController() {
           status: usuario.status,
           cidade: usuario.cidade,
           estado: usuario.estado,
-          cdl_id: usuario.cdl_id,
-          empresa_pai_id: usuario.empresa_pai_id || null
+          cdl_id: usuario.cdl_id
         },
         token
       };
@@ -183,7 +168,6 @@ function UsuarioController() {
   async function listar(req, res) {
     try {
       const usuarios = await usuariosRepository.listarUsuariosComFiltros(req.user);
-      
       res.json(usuarios.map((u) => {
         const usuario = u.toJSON();
         delete usuario.senha;
@@ -224,7 +208,6 @@ function UsuarioController() {
         return res.status(403).json({ error: "Não autorizado a editar este perfil." });
       }
 
-      // Campos que não podem ser alterados diretamente
       delete dadosAtualizacao.senha;
       delete dadosAtualizacao.role;
       delete dadosAtualizacao.usuario_id;
@@ -232,7 +215,6 @@ function UsuarioController() {
       delete dadosAtualizacao.pontos;
       delete dadosAtualizacao.status;
       delete dadosAtualizacao.cdl_id;
-      delete dadosAtualizacao.empresa_pai_id;
 
       if (dadosAtualizacao.telefone) {
         const telefoneLimpo = dadosAtualizacao.telefone.replace(/\D/g, '');
@@ -343,7 +325,6 @@ function UsuarioController() {
     try {
       const { id } = req.params;
       
-      // Apenas admin pode deletar usuários
       if (req.user.role !== 'admin') {
         return res.status(403).json({ error: "Apenas administradores podem excluir usuários" });
       }
@@ -376,22 +357,8 @@ function UsuarioController() {
   async function listarLojasDaCdl(req, res) {
     try {
       const { cdl_id } = req.params;
-      
-      const cdl = await usuariosRepository.buscarCdlPorId(cdl_id);
-      if (!cdl) {
-        return res.status(404).json({ error: 'CDL não encontrada' });
-      }
-      
       const lojas = await usuariosRepository.listarLojasPorCdl(cdl_id);
-      res.json({
-        cdl: {
-          id: cdl.usuario_id,
-          nome: cdl.nome,
-          cidade: cdl.cidade,
-          estado: cdl.estado
-        },
-        lojas
-      });
+      res.json(lojas);
     } catch (error) {
       console.error('Erro ao listar lojas da CDL:', error);
       res.status(500).json({ error: error.message });
@@ -520,10 +487,18 @@ function UsuarioController() {
     try {
       let where = { role: 'empresa', status: 'ativo' };
       
-      // Se for CDL, filtrar por suas lojas
       if (req.user.role === 'cdl') {
-        where.empresa_pai_id = req.user.usuario_id;
-      } else if (req.user.role === 'empresa') {
+        where.cdl_id = req.user.usuario_id;
+      } 
+      else if (req.user.role === 'cliente') {
+        const cliente = await usuariosRepository.buscarUsuarioPorId(req.user.usuario_id);
+        if (cliente && cliente.cdl_id) {
+          where.cdl_id = cliente.cdl_id;
+        } else {
+          return res.json([]);
+        }
+      }
+      else if (req.user.role === 'empresa') {
         where.usuario_id = { [Op.ne]: req.user.usuario_id };
       }
       
@@ -582,7 +557,6 @@ function UsuarioController() {
 
   // ==================== RETORNO DO CONTROLLER ====================
   return {
-    // Funções básicas
     cadastrar,
     logar,
     listar,
@@ -591,14 +565,10 @@ function UsuarioController() {
     alterarSenha,
     atualizarFotoPerfil,
     deletar,
-    
-    // Funções CDL
     listarCdls,
     listarLojasDaCdl,
     getDashboardCdl,
     trocarCdlDoCliente,
-    
-    // Funções administrativas
     visualizarUsuario,
     tornarAdmin,
     tornarCdl,

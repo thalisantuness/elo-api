@@ -73,11 +73,24 @@ async function criarUsuario(dados) {
       }
     }
     
-    const usuarioCriado = await Usuario.create({
-      ...usuario,
+    const usuarioParaCriar = {
+      nome: usuario.nome,
+      telefone: usuario.telefone,
+      email: usuario.email,
       senha: senhaHash,
+      role: usuario.role,
+      cliente_endereco: usuario.cliente_endereco,
+      cidade: usuario.cidade,
+      estado: usuario.estado,
+      cdl_id: usuario.cdl_id,
+      status: usuario.status,
+      pontos: usuario.pontos || 0,
+      cnpj: usuario.cnpj,
+      modalidade_pontuacao: usuario.modalidade_pontuacao || 'regras',
       foto_perfil
-    }, { transaction: t });
+    };
+
+    const usuarioCriado = await Usuario.create(usuarioParaCriar, { transaction: t });
 
     return usuarioCriado;
   });
@@ -94,11 +107,6 @@ async function buscarUsuarioPorId(id) {
       {
         model: Usuario,
         as: 'cdl',
-        attributes: ['usuario_id', 'nome', 'cidade', 'estado']
-      },
-      {
-        model: Usuario,
-        as: 'cdl_cliente',
         attributes: ['usuario_id', 'nome', 'cidade', 'estado']
       }
     ]
@@ -185,20 +193,19 @@ async function listarUsuariosComFiltros(usuarioLogado, filtros = {}) {
   const { role, usuario_id } = usuarioLogado;
   let whereClause = { ...filtros };
 
-  // Aplicar filtros baseados na role
   switch (role) {
-    case 'admin': // Cardial - vê tudo
+    case 'admin':
       break;
       
-    case 'cdl': // CDL - vê suas lojas e seus clientes
+    case 'cdl':
       whereClause[Op.or] = [
-        { role: 'empresa', empresa_pai_id: usuario_id },
+        { role: 'empresa', cdl_id: usuario_id },
         { role: 'cliente', cdl_id: usuario_id },
-        { role: 'empresa-funcionario', empresa_pai_id: usuario_id }
+        { role: 'empresa-funcionario', cdl_id: usuario_id }
       ];
       break;
       
-    case 'empresa': // Loja - vê seus clientes (que compraram nela)
+    case 'empresa':
       whereClause = {
         role: 'cliente',
         usuario_id: {
@@ -210,12 +217,12 @@ async function listarUsuariosComFiltros(usuarioLogado, filtros = {}) {
       };
       break;
       
-    case 'cliente': // Cliente - vê lojas da sua CDL
+    case 'cliente':
       const cliente = await Usuario.findByPk(usuario_id);
       if (cliente && cliente.cdl_id) {
         whereClause = {
           role: 'empresa',
-          empresa_pai_id: cliente.cdl_id,
+          cdl_id: cliente.cdl_id,
           status: 'ativo'
         };
       } else {
@@ -265,7 +272,7 @@ async function listarCdlsAtivas() {
 async function listarLojasPorCdl(cdl_id, apenasAtivas = true) {
   const where = { 
     role: 'empresa',
-    empresa_pai_id: cdl_id
+    cdl_id: cdl_id
   };
   
   if (apenasAtivas) {
@@ -274,7 +281,7 @@ async function listarLojasPorCdl(cdl_id, apenasAtivas = true) {
   
   return Usuario.findAll({
     where,
-    attributes: ['usuario_id', 'nome', 'telefone', 'endereco', 'foto_perfil', 'cidade', 'status'],
+    attributes: ['usuario_id', 'nome', 'telefone', 'foto_perfil', 'cidade', 'status'],
     order: [['nome', 'ASC']]
   });
 }
@@ -293,7 +300,7 @@ async function contarLojasDaCdl(cdl_id) {
   return Usuario.count({
     where: { 
       role: 'empresa',
-      empresa_pai_id: cdl_id,
+      cdl_id: cdl_id,
       status: 'ativo'
     }
   });
@@ -315,7 +322,7 @@ async function getDashboardCdl(cdl_id) {
     Usuario.findAll({
       where: { 
         role: 'empresa',
-        empresa_pai_id: cdl_id
+        cdl_id: cdl_id
       },
       attributes: ['usuario_id', 'nome', 'status', 'data_cadastro', 'foto_perfil'],
       order: [['data_cadastro', 'DESC']],
@@ -407,7 +414,7 @@ async function listarEmpresas(whereClause = {}) {
 }
 
 async function atualizarDadosEmpresa(usuario_id, dados) {
-  const { cnpj, endereco, telefone, cidade, estado, modalidade_pontuacao, nome_regra, tipo, valor_minimo, pontos, multiplicador } = dados;
+  const { cnpj, telefone, cidade, estado, modalidade_pontuacao, nome_regra, tipo, valor_minimo, pontos, multiplicador } = dados;
   const usuarioExistente = await Usuario.findByPk(usuario_id, { include: [{ model: Regra, as: 'regra' }] });
   
   if (!usuarioExistente) {
@@ -422,7 +429,7 @@ async function atualizarDadosEmpresa(usuario_id, dados) {
     throw new Error('Modalidade de pontuação inválida. Use: regras ou 1pt_real_1pt_compra');
   }
 
-  const dadosBasicos = { cnpj, endereco, telefone, cidade, estado };
+  const dadosBasicos = { cnpj, telefone, cidade, estado };
   if (modalidade_pontuacao !== undefined) {
     dadosBasicos.modalidade_pontuacao = modalidade_pontuacao;
   }
@@ -473,7 +480,7 @@ async function buscarIdsEmpresasFilhas(empresaPaiId, visitados = new Set()) {
   const empresasFilhas = await Usuario.findAll({
     where: {
       role: 'empresa',
-      empresa_pai_id: empresaPaiId
+      cdl_id: empresaPaiId
     },
     attributes: ['usuario_id']
   });
@@ -487,7 +494,6 @@ async function buscarIdsEmpresasFilhas(empresaPaiId, visitados = new Set()) {
 }
 
 module.exports = {
-  // Funções básicas
   criarUsuario,
   buscarUsuarioPorId,
   buscarUsuarioPorEmail,
@@ -499,8 +505,6 @@ module.exports = {
   listarUsuarios,
   listarUsuariosComFiltros,
   buscarIdsEmpresasFilhas,
-  
-  // Funções específicas CDL
   listarCdlsAtivas,
   listarLojasPorCdl,
   buscarCdlPorId,
@@ -508,8 +512,6 @@ module.exports = {
   contarClientesDaCdl,
   getDashboardCdl,
   trocarCdlDoCliente,
-  
-  // Funções administrativas
   listarEmpresas,
   tornarUsuarioAdmin,
   tornarUsuarioCdl,

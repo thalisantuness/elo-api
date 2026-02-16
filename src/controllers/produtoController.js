@@ -1,7 +1,9 @@
 const produtoRepo = require('../repositories/produtoRepository');
+const usuariosRepo = require('../repositories/usuariosRepository');
 const sharp = require('sharp');
 const s3 = require('../utils/awsConfig');
 const { v4: uuidv4 } = require('uuid');
+const { Op } = require('sequelize');
 
 function ProdutoController() {
   function validateBase64Image(base64String) {
@@ -23,7 +25,6 @@ function ProdutoController() {
       throw new Error('Dados de imagem base64 muito pequenos ou vazios');
     }
 
-    // Verificar se é base64 válido
     const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
     if (!base64Regex.test(base64Data)) {
       throw new Error('Dados base64 contêm caracteres inválidos');
@@ -34,12 +35,10 @@ function ProdutoController() {
 
   async function compressImage(buffer) {
     try {
-      // Verificar se o buffer tem conteúdo
       if (!buffer || buffer.length === 0) {
         throw new Error('Buffer de imagem vazio');
       }
 
-      // Verificar se o buffer é uma imagem válida
       const metadata = await sharp(buffer).metadata();
       console.log('Metadata da imagem:', metadata);
       
@@ -47,7 +46,6 @@ function ProdutoController() {
         throw new Error('Formato de imagem não suportado');
       }
       
-      // Redimensionar e comprimir a imagem
       return await sharp(buffer)
         .resize(800, 800, { 
           fit: 'inside',
@@ -57,7 +55,6 @@ function ProdutoController() {
         .toBuffer();
     } catch (error) {
       console.error('Erro ao comprimir imagem:', error.message);
-      console.error('Tamanho do buffer:', buffer ? buffer.length : 'undefined');
       throw new Error(`Erro ao processar imagem: ${error.message}`);
     }
   }
@@ -73,63 +70,49 @@ function ProdutoController() {
         ACL: 'public-read'
       }).promise();
       
-      console.log(`Upload realizado com sucesso: ${result.Location}`);
+      console.log(`✅ Upload realizado com sucesso: ${result.Location}`);
       return result.Location;
     } catch (error) {
-      console.error('Erro no upload para S3:', error.message);
+      console.error('❌ Erro no upload para S3:', error.message);
       throw error;
     }
   }
 
   async function listar(req, res) {
     try {
-      const { Op } = require('sequelize');
-      const usuariosRepo = require('../repositories/usuariosRepository');
       const filtros = req.query || {};
       
-      // Lógica de filtragem baseada no role
       if (req.user) {
-        console.log('🔍 [GET /produtos] Usuário autenticado:', {
+        console.log('🔍 Usuário autenticado:', {
           usuario_id: req.user.usuario_id,
           role: req.user.role
         });
 
-        // Buscar dados completos do usuário para verificar empresa_pai_id
         const usuarioCompleto = await usuariosRepo.buscarUsuarioPorId(req.user.usuario_id);
-        console.log('👤 [GET /produtos] Dados completos do usuário:', {
-          usuario_id: usuarioCompleto?.usuario_id,
-          role: usuarioCompleto?.role,
-          empresa_pai_id: usuarioCompleto?.empresa_pai_id,
-          nome: usuarioCompleto?.nome
-        });
-
-        // Se o usuário tem empresa_pai_id, ele é um funcionário (mesmo que role seja "empresa")
-        if (usuarioCompleto && usuarioCompleto.empresa_pai_id) {
-          // Funcionário vê produtos da empresa pai + produtos de todas as empresas filhas
-          const idsEmpresas = await usuariosRepo.buscarIdsEmpresasFilhas(usuarioCompleto.empresa_pai_id);
-          console.log('👔 [GET /produtos] Funcionário - IDs de empresas (pai + filhas):', idsEmpresas);
-          filtros.empresa_id = { [Op.in]: idsEmpresas };
-        } else if (req.user.role === 'empresa') {
-          // Empresa (sem empresa_pai_id) vê seus produtos + produtos de todas as empresas filhas (recursivamente)
-          const idsEmpresas = await usuariosRepo.buscarIdsEmpresasFilhas(req.user.usuario_id);
-          console.log('🏢 [GET /produtos] Empresa - IDs de empresas (pai + filhas):', idsEmpresas);
-          filtros.empresa_id = { [Op.in]: idsEmpresas };
-        } else if (req.user.role === 'empresa-funcionario') {
-          // Funcionário sem empresa_pai_id (dados inconsistentes) - retornar vazio
-          console.warn('⚠️ [GET /produtos] Funcionário sem empresa_pai_id - retornando array vazio');
-          return res.json([]);
+        
+        if (req.user.role === 'cdl') {
+          const lojas = await usuariosRepo.listarLojasPorCdl(req.user.usuario_id);
+          const idsLojas = lojas.map(l => l.usuario_id);
+          idsLojas.push(req.user.usuario_id);
+          filtros.empresa_id = { [Op.in]: idsLojas };
+          console.log('🏢 CDL - IDs:', idsLojas);
         }
-        // Admin e cliente veem todos os produtos (marketplace) - não filtra por empresa_id
-      } else {
-        console.log('🌐 [GET /produtos] Requisição pública (sem autenticação) - retornando todos os produtos');
+        else if (req.user.role === 'empresa') {
+          filtros.empresa_id = req.user.usuario_id;
+          console.log('🏬 Loja - vendo apenas seus produtos');
+        }
+        else if (req.user.role === 'cliente' && usuarioCompleto?.cdl_id) {
+          const lojas = await usuariosRepo.listarLojasPorCdl(usuarioCompleto.cdl_id);
+          const idsLojas = lojas.map(l => l.usuario_id);
+          filtros.empresa_id = { [Op.in]: idsLojas };
+          console.log('👤 Cliente - vendo produtos das lojas da CDL');
+        }
       }
       
-      console.log('📦 [GET /produtos] Filtros aplicados:', JSON.stringify(filtros, null, 2));
       const produtos = await produtoRepo.listarProdutos(filtros);
-      console.log(`✅ [GET /produtos] Retornando ${produtos.length} produto(s)`);
       res.json(produtos);
     } catch (e) {
-      console.error('❌ [GET /produtos] Erro ao listar produtos:', e);
+      console.error('❌ Erro ao listar produtos:', e);
       res.status(500).json({ error: 'Erro ao listar produtos' });
     }
   }
@@ -148,34 +131,37 @@ function ProdutoController() {
 
   async function criar(req, res) {
     try {
-      const { nome, valor, tipo_comercializacao, tipo_produto, estado_id, foto_principal, fotos_secundarias, valor_custo, quantidade, empresa_id } = req.body;
+      const { 
+        nome, valor, tipo_comercializacao, tipo_produto, 
+        imagem_base64,  // <-- CORRIGIDO: usar imagem_base64
+        fotos_secundarias, valor_custo, quantidade, empresa_id 
+      } = req.body;
 
-      // Validar autenticação
       if (!req.user) {
         return res.status(401).json({ error: 'Autenticação necessária para criar produto' });
+      }
+
+      const rolesPermitidas = ['empresa', 'cdl', 'admin'];
+      if (!rolesPermitidas.includes(req.user.role)) {
+        return res.status(403).json({ 
+          error: 'Apenas empresas, CDLs e administradores podem criar produtos' 
+        });
       }
 
       if (!nome || !valor || !valor_custo || !quantidade) {
         return res.status(400).json({ error: 'nome, valor, valor_custo e quantidade são obrigatórios' });
       }
 
-      // Determinar empresa_id baseado no role
       let empresaIdFinal = empresa_id;
+      
       if (req.user.role === 'empresa') {
-        // Empresa cria produto para si mesma
         empresaIdFinal = req.user.usuario_id;
-      } else if (req.user.role === 'empresa-funcionario') {
-        // Funcionário cria produto para a empresa pai
-        const funcionario = await require('../repositories/usuariosRepository').buscarUsuarioPorId(req.user.usuario_id);
-        if (!funcionario || !funcionario.empresa_pai_id) {
-          return res.status(403).json({ error: 'Funcionário não vinculado a uma empresa' });
-        }
-        empresaIdFinal = funcionario.empresa_pai_id;
-      } else if (req.user.role === 'admin') {
-        // Admin pode especificar empresa_id ou usar seu próprio ID
+      } 
+      else if (req.user.role === 'cdl') {
+        empresaIdFinal = req.user.usuario_id;
+      }
+      else if (req.user.role === 'admin') {
         empresaIdFinal = empresa_id || req.user.usuario_id;
-      } else {
-        return res.status(403).json({ error: 'Apenas empresas, funcionários e admins podem criar produtos' });
       }
 
       if (!empresaIdFinal) {
@@ -187,37 +173,33 @@ function ProdutoController() {
         valor, 
         tipo_comercializacao, 
         tipo_produto, 
-        estado_id, 
         valor_custo, 
         quantidade,
         empresa_id: empresaIdFinal
       };
 
-      if (foto_principal && foto_principal.startsWith('data:image')) {
+      // Processar imagem_base64 (NÃO foto_principal)
+      if (imagem_base64 && imagem_base64.startsWith('data:image')) {
         try {
-          // Validar base64
-          const base64Data = validateBase64Image(foto_principal);
-          console.log('Processando foto principal, tamanho base64:', base64Data.length);
-          
+          console.log('📸 Processando imagem_base64...');
+          const base64Data = validateBase64Image(imagem_base64);
           const buffer = Buffer.from(base64Data, 'base64');
-          console.log('Buffer criado, tamanho:', buffer.length);
-          
           const compressed = await compressImage(buffer);
-          console.log('Imagem comprimida, tamanho:', compressed.length);
-          
-          dados.foto_principal = await uploadToS3(compressed, 'produtos/principal');
-          console.log('Foto principal salva no S3:', dados.foto_principal);
+          const url = await uploadToS3(compressed, 'produtos/principal');
+          dados.foto_principal = url; // Salva a URL no campo foto_principal
+          console.log('✅ Foto principal salva:', url);
         } catch (error) {
-          console.error('Erro ao fazer upload da foto principal para S3:', error.message);
+          console.error('❌ Erro no upload:', error.message);
           return res.status(400).json({ 
-            error: `Erro ao processar foto principal: ${error.message}`,
-            details: 'Verifique se a imagem está em formato válido (JPEG, PNG, etc.) e se o base64 está completo'
+            error: `Erro ao processar imagem: ${error.message}`
           });
         }
       }
 
+      console.log('📦 Criando produto com dados:', dados);
       const produto = await produtoRepo.criarProduto(dados);
 
+      // Processar fotos secundárias
       if (Array.isArray(fotos_secundarias)) {
         for (const base64 of fotos_secundarias) {
           if (base64 && base64.startsWith('data:image')) {
@@ -227,18 +209,19 @@ function ProdutoController() {
               const comp = await compressImage(buf);
               const url = await uploadToS3(comp, 'produtos/secundarias');
               await produtoRepo.adicionarFoto(produto.produto_id, url);
-              console.log('Foto secundária salva no S3:', url);
+              console.log('✅ Foto secundária salva:', url);
             } catch (error) {
-              console.error('Erro ao fazer upload da foto secundária para S3:', error.message);
-              // Continuar com as outras fotos mesmo se uma falhar
+              console.error('❌ Erro em foto secundária:', error.message);
             }
           }
         }
       }
 
-      res.status(201).json(produto);
+      // Buscar produto completo com fotos
+      const produtoCompleto = await produtoRepo.buscarProdutoPorId(produto.produto_id);
+      res.status(201).json(produtoCompleto);
     } catch (e) {
-      console.error('Erro ao criar produto:', e);
+      console.error('❌ Erro ao criar produto:', e);
       res.status(500).json({ error: 'Erro ao criar produto' });
     }
   }
@@ -248,61 +231,35 @@ function ProdutoController() {
       const { id } = req.params;
       const dados = { ...req.body };
 
-      // Processar foto_principal se for base64 (converter para S3)
-      if (dados.foto_principal && dados.foto_principal.startsWith('data:image')) {
-        try {
-          // Validar base64
-          const base64Data = validateBase64Image(dados.foto_principal);
-          console.log('Processando foto principal no update, tamanho base64:', base64Data.length);
-          
-          const buffer = Buffer.from(base64Data, 'base64');
-          console.log('Buffer criado, tamanho:', buffer.length);
-          
-          const compressed = await compressImage(buffer);
-          console.log('Imagem comprimida, tamanho:', compressed.length);
-          
-          dados.foto_principal = await uploadToS3(compressed, 'produtos/principal');
-          console.log('Foto principal salva no S3:', dados.foto_principal);
-        } catch (error) {
-          console.error('Erro ao fazer upload da foto principal para S3:', error.message);
-          return res.status(400).json({ 
-            error: `Erro ao processar foto principal: ${error.message}`,
-            details: 'Verifique se a imagem está em formato válido (JPEG, PNG, etc.) e se o base64 está completo'
-          });
-        }
-      } else if (dados.foto_principal === '' || dados.foto_principal === null) {
-        // Se enviar string vazia ou null, não atualizar (manter atual)
-        delete dados.foto_principal;
-      } else if (dados.foto_principal && !dados.foto_principal.startsWith('http')) {
-        // Se não for base64 nem URL válida, pode ser um erro
-        return res.status(400).json({ 
-          error: 'foto_principal deve ser uma URL do S3 ou base64 (data:image/...)'
-        });
+      const produto = await produtoRepo.buscarProdutoPorId(id);
+      if (!produto) {
+        return res.status(404).json({ error: 'Produto não encontrado' });
       }
 
-      // Remover menu dos dados (não é mais usado)
-      delete dados.menu;
+      if (produto.empresa_id !== req.user.usuario_id && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Você não tem permissão para atualizar este produto' });
+      }
 
-      // Lógica de empresas_autorizadas na atualização desativada temporariamente
-      // if (dados.empresas_autorizadas !== undefined) {
-      //   if (!req.user) {
-      //     return res.status(401).json({ error: 'Autenticação necessária' });
-      //   }
-      //   if (req.user.role === 'empresa') {
-      //     return res.status(403).json({ 
-      //       error: 'Usuários do tipo empresa não podem alterar o campo empresas_autorizadas' 
-      //     });
-      //   } else if (req.user.role === 'admin') {
-      //     if (!Array.isArray(dados.empresas_autorizadas)) {
-      //       return res.status(400).json({ 
-      //         error: 'empresas_autorizadas deve ser um array de IDs' 
-      //       });
-      //     }
-      //   }
-      // }
+      // Processar imagem_base64 se fornecida
+      if (dados.imagem_base64 && dados.imagem_base64.startsWith('data:image')) {
+        try {
+          console.log('📸 Atualizando imagem...');
+          const base64Data = validateBase64Image(dados.imagem_base64);
+          const buffer = Buffer.from(base64Data, 'base64');
+          const compressed = await compressImage(buffer);
+          const url = await uploadToS3(compressed, 'produtos/principal');
+          dados.foto_principal = url;
+          delete dados.imagem_base64; // Remove o campo temporário
+        } catch (error) {
+          console.error('❌ Erro no upload:', error.message);
+          return res.status(400).json({ 
+            error: `Erro ao processar imagem: ${error.message}`
+          });
+        }
+      }
 
-      const produto = await produtoRepo.atualizarProduto(id, dados);
-      res.json(produto);
+      const produtoAtualizado = await produtoRepo.atualizarProduto(id, dados);
+      res.json(produtoAtualizado);
     } catch (e) {
       console.error('Erro ao atualizar produto:', e);
       res.status(500).json({ error: e.message || 'Erro ao atualizar produto' });
@@ -312,6 +269,16 @@ function ProdutoController() {
   async function deletar(req, res) {
     try {
       const { id } = req.params;
+      
+      const produto = await produtoRepo.buscarProdutoPorId(id);
+      if (!produto) {
+        return res.status(404).json({ error: 'Produto não encontrado' });
+      }
+
+      if (produto.empresa_id !== req.user.usuario_id && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Você não tem permissão para deletar este produto' });
+      }
+
       const resultado = await produtoRepo.deletarProduto(id);
       res.json(resultado);
     } catch (e) {
@@ -324,8 +291,18 @@ function ProdutoController() {
     try {
       const { id } = req.params;
       const { imageBase64 } = req.body;
+      
       if (!imageBase64 || !imageBase64.startsWith('data:image')) {
         return res.status(400).json({ error: 'Imagem inválida' });
+      }
+
+      const produto = await produtoRepo.buscarProdutoPorId(id);
+      if (!produto) {
+        return res.status(404).json({ error: 'Produto não encontrado' });
+      }
+
+      if (produto.empresa_id !== req.user.usuario_id && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Você não tem permissão para adicionar fotos' });
       }
       
       try {
@@ -337,11 +314,8 @@ function ProdutoController() {
         const foto = await produtoRepo.adicionarFoto(id, url);
         res.status(201).json(foto);
       } catch (error) {
-        console.error('Erro ao fazer upload da foto para S3:', error.message);
-        res.status(400).json({ 
-          error: `Erro ao processar imagem: ${error.message}`,
-          details: 'Verifique se a imagem está em formato válido e se o base64 está completo'
-        });
+        console.error('Erro no upload:', error.message);
+        res.status(400).json({ error: error.message });
       }
     } catch (e) {
       console.error('Erro ao adicionar foto:', e);
@@ -352,6 +326,16 @@ function ProdutoController() {
   async function deletarFoto(req, res) {
     try {
       const { id, fotoId } = req.params;
+      
+      const produto = await produtoRepo.buscarProdutoPorId(id);
+      if (!produto) {
+        return res.status(404).json({ error: 'Produto não encontrado' });
+      }
+
+      if (produto.empresa_id !== req.user.usuario_id && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Você não tem permissão para deletar fotos' });
+      }
+
       const resultado = await produtoRepo.deletarFoto(id, fotoId);
       res.json(resultado);
     } catch (e) {
@@ -360,7 +344,15 @@ function ProdutoController() {
     }
   }
 
-  return { listar, buscarPorId, criar, atualizar, deletar, adicionarFoto, deletarFoto };
+  return { 
+    listar, 
+    buscarPorId, 
+    criar, 
+    atualizar, 
+    deletar, 
+    adicionarFoto, 
+    deletarFoto 
+  };
 }
 
 module.exports = ProdutoController;

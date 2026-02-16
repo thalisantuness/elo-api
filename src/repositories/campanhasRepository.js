@@ -4,6 +4,7 @@ const sequelize = require("../utils/db");
 const s3 = require("../utils/awsConfig");
 const { v4: uuidv4 } = require("uuid");
 const sharp = require("sharp");
+const { Op } = require('sequelize'); // IMPORTANTE: Adicionar esta linha!
 
 // ==================== FUNÇÕES DE UPLOAD ====================
 
@@ -93,6 +94,11 @@ async function criar(dados) {
 async function listarPorEmpresa(empresa_id) {
   return Campanha.findAll({
     where: { empresa_id },
+    include: [{
+      model: Usuario,
+      as: 'empresa',
+      attributes: ['usuario_id', 'nome', 'role', 'cdl_id']
+    }],
     order: [['data_cadastro', 'DESC']],
   });
 }
@@ -102,25 +108,69 @@ async function listarTodas() {
     include: [{
       model: Usuario,
       as: 'empresa',
-      attributes: ['usuario_id', 'nome', 'email', 'foto_perfil', 'cidade', 'estado'],
+      attributes: ['usuario_id', 'nome', 'email', 'foto_perfil', 'cidade', 'estado', 'role', 'cdl_id'],
     }],
     order: [['data_cadastro', 'DESC']],
   });
 }
 
 async function listarPorCdl(cdl_id) {
-  // Busca campanhas de todas as lojas da CDL e da própria CDL
+  // Primeiro busca todas as lojas desta CDL
+  const lojas = await Usuario.findAll({
+    where: { 
+      role: 'empresa',
+      cdl_id: cdl_id
+    },
+    attributes: ['usuario_id']
+  });
+  
+  const idsLojas = lojas.map(l => l.usuario_id);
+  
+  // Busca campanhas da própria CDL e das lojas
   return Campanha.findAll({
+    where: {
+      [Op.or]: [
+        { empresa_id: cdl_id }, // Campanhas da própria CDL
+        { empresa_id: { [Op.in]: idsLojas } } // Campanhas das lojas
+      ]
+    },
     include: [{
       model: Usuario,
       as: 'empresa',
-      where: {
-        [Op.or]: [
-          { usuario_id: cdl_id }, // A própria CDL
-          { empresa_pai_id: cdl_id } // Lojas da CDL
-        ]
-      },
-      attributes: ['usuario_id', 'nome', 'role'],
+      attributes: ['usuario_id', 'nome', 'role', 'cdl_id']
+    }],
+    order: [['data_cadastro', 'DESC']],
+  });
+}
+
+async function listarPorCliente(cdl_id) {
+  // Cliente vê campanhas ativas da CDL e das lojas da CDL
+  const lojas = await Usuario.findAll({
+    where: { 
+      role: 'empresa',
+      cdl_id: cdl_id,
+      status: 'ativo'
+    },
+    attributes: ['usuario_id']
+  });
+  
+  const idsLojas = lojas.map(l => l.usuario_id);
+  const agora = new Date();
+  
+  return Campanha.findAll({
+    where: {
+      [Op.or]: [
+        { empresa_id: cdl_id }, // Campanhas da própria CDL
+        { empresa_id: { [Op.in]: idsLojas } } // Campanhas das lojas
+      ],
+      ativa: true,
+      data_inicio: { [Op.lte]: agora },
+      data_fim: { [Op.gte]: agora }
+    },
+    include: [{
+      model: Usuario,
+      as: 'empresa',
+      attributes: ['usuario_id', 'nome', 'role', 'cdl_id']
     }],
     order: [['data_cadastro', 'DESC']],
   });
@@ -131,7 +181,7 @@ async function buscarPorId(id) {
     include: [{
       model: Usuario,
       as: 'empresa',
-      attributes: ['usuario_id', 'nome', 'email', 'foto_perfil', 'role', 'cidade', 'estado'],
+      attributes: ['usuario_id', 'nome', 'email', 'foto_perfil', 'role', 'cidade', 'estado', 'cdl_id'],
     }],
   });
   
@@ -209,6 +259,7 @@ module.exports = {
   listarPorEmpresa,
   listarTodas,
   listarPorCdl,
+  listarPorCliente,
   buscarPorId,
   atualizar,
   excluir,

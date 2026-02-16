@@ -30,6 +30,17 @@ const campanhasController = CampanhasController();
 const ComprasController = require('../controllers/comprasController');
 const comprasController = ComprasController();
 
+
+router.post('/login', usuariosController.logar);
+router.post('/usuarios', usuariosController.cadastrar);
+router.get('/cdls', usuariosController.listarCdls);
+router.get('/cdls/:cdl_id/lojas', usuariosController.listarLojasDaCdl);
+
+// ==================== ROTAS AUTENTICADAS ====================
+router.use(authMiddleware);
+
+router.get('/empresas', usuariosController.listarEmpresas);
+
 // ==================== ROTAS PÚBLICAS ====================
 
 // Autenticação

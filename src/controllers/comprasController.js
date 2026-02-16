@@ -1,6 +1,5 @@
 const compraRepository = require('../repositories/compraRepository');
-const { Usuario } = require('../model/Usuarios');
-const { generateQRCode } = require('../services/qrCodeService');
+const { gerarQRCodeParaCompra } = require('../services/qrCodeService');
 
 function ComprasController() {
   async function listarCompras(req, res) {
@@ -9,7 +8,7 @@ function ComprasController() {
       let compras;
       if (role === 'admin') {
         compras = await compraRepository.listarCompras();
-      } else if (role === 'empresa') {
+      } else if (role === 'empresa' || role === 'cdl') {
         compras = await compraRepository.listarComprasPorEmpresa(usuario_id);
       } else if (role === 'cliente') {
         compras = await compraRepository.listarComprasPorCliente(usuario_id);
@@ -39,8 +38,9 @@ function ComprasController() {
     const { valor, campanha_id } = req.body;
     const { usuario_id, role } = req.user;
     
-    if (role !== 'empresa') {
-      return res.status(403).json({ error: 'Apenas empresas podem gerar QR codes' });
+    // CORREÇÃO: Admin, CDL e Empresa podem gerar QR Code
+    if (!['admin', 'cdl', 'empresa'].includes(role)) {
+      return res.status(403).json({ error: 'Apenas administradores, CDLs e empresas podem gerar QR codes' });
     }
     
     if (!valor || valor <= 0) {
@@ -57,7 +57,8 @@ function ComprasController() {
       });
       
       // Gerar QR code
-      const qrCodeBase64 = await generateQRCode(compra.qr_code_data);
+  const qrCodeResult = await gerarQRCodeParaCompra(compra.compra_id, usuario_id);
+const qrCodeBase64 = qrCodeResult.qr_code_image;
       
       res.status(201).json({
         message: 'QR code gerado com sucesso para compra pendente',
@@ -66,7 +67,7 @@ function ComprasController() {
         qr_code_data: compra.qr_code_data,
         expira_em: compra.qr_code_expira_em,
         valor: compra.valor,
-        pontos_estimados: compra.pontos_adquiridos
+        pontos_estimados: compra.pontos_adquiridos // Regra padrão: 1 ponto por real
       });
     } catch (error) {
       console.error('Erro ao gerar QR code:', error);
@@ -78,6 +79,7 @@ function ComprasController() {
     const { qr_code_data } = req.body;
     const { usuario_id, role } = req.user;
     
+    // Apenas clientes podem claimar compras
     if (role !== 'cliente') {
       return res.status(403).json({ error: 'Apenas clientes podem claimar compras' });
     }
@@ -128,12 +130,12 @@ function ComprasController() {
   async function estatisticasEmpresa(req, res) {
     const { usuario_id, role } = req.user;
     
-    if (role !== 'empresa' && role !== 'admin') {
-      return res.status(403).json({ error: 'Apenas empresas podem ver estatísticas' });
+    if (!['empresa', 'cdl', 'admin'].includes(role)) {
+      return res.status(403).json({ error: 'Apenas empresas, CDLs e admins podem ver estatísticas' });
     }
     
     try {
-      const empresaId = role === 'admin' && req.query.empresa_id ? req.query.empresa_id : usuario_id;
+      const empresaId = (role === 'admin' && req.query.empresa_id) ? req.query.empresa_id : usuario_id;
       const estatisticas = await compraRepository.estatisticasEmpresa(empresaId);
       res.status(200).json(estatisticas);
     } catch (error) {

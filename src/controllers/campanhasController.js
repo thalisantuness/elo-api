@@ -1,5 +1,5 @@
 const campanhasRepository = require('../repositories/campanhasRepository');
-const { Op } = require('sequelize');
+const usuariosRepository = require('../repositories/usuariosRepository');
 
 function CampanhasController() {
   async function criar(req, res) {
@@ -12,7 +12,7 @@ function CampanhasController() {
       
       let empresa_id;
       if (role === 'admin') {
-        if (req.body.empresa_id == null) {
+        if (!req.body.empresa_id) {
           return res.status(400).json({ error: 'Administrador deve informar empresa_id no body para criar campanha' });
         }
         empresa_id = req.body.empresa_id;
@@ -68,36 +68,34 @@ function CampanhasController() {
     try {
       const { usuario_id, role } = req.user;
       
-      if (role !== 'empresa' && role !== 'cdl' && role !== 'admin' && role !== 'cliente') {
-        return res.status(403).json({ error: 'Não autorizado' });
-      }
+      let campanhas = [];
       
-      let campanhas;
-      
-      if (role === 'admin') {
-        if (req.query.cdl_id) {
-          campanhas = await campanhasRepository.listarPorCdl(req.query.cdl_id);
-        } else if (req.query.empresa_id) {
-          campanhas = await campanhasRepository.listarPorEmpresa(req.query.empresa_id);
-        } else {
+      switch (role) {
+        case 'admin':
+          // Admin vê todas as campanhas
           campanhas = await campanhasRepository.listarTodas();
-        }
-      } else if (role === 'cdl') {
-        // CDL vê campanhas dela e das suas lojas
-        campanhas = await campanhasRepository.listarPorCdl(usuario_id);
-      } else if (role === 'empresa') {
-        // Loja vê apenas suas campanhas
-        campanhas = await campanhasRepository.listarPorEmpresa(usuario_id);
-      } else if (role === 'cliente') {
-        // Cliente vê campanhas ativas da sua CDL e das lojas da CDL
-        const cliente = await require('../repositories/usuariosRepository').buscarUsuarioPorId(usuario_id);
-        if (cliente && cliente.cdl_id) {
-          campanhas = await campanhasRepository.listarPorCdl(cliente.cdl_id);
-          // Filtrar apenas ativas
-          campanhas = campanhas.filter(c => c.ativa && new Date(c.data_inicio) <= new Date() && new Date(c.data_fim) >= new Date());
-        } else {
-          campanhas = [];
-        }
+          break;
+          
+        case 'cdl':
+          // CDL vê campanhas dela e das suas lojas
+          campanhas = await campanhasRepository.listarPorCdl(usuario_id);
+          break;
+          
+        case 'empresa':
+          // Loja vê apenas suas próprias campanhas
+          campanhas = await campanhasRepository.listarPorEmpresa(usuario_id);
+          break;
+          
+        case 'cliente':
+          // Cliente vê campanhas ativas da sua CDL e das lojas da CDL
+          const cliente = await usuariosRepository.buscarUsuarioPorId(usuario_id);
+          if (cliente && cliente.cdl_id) {
+            campanhas = await campanhasRepository.listarPorCliente(cliente.cdl_id);
+          }
+          break;
+          
+        default:
+          return res.status(403).json({ error: 'Não autorizado' });
       }
       
       res.json(campanhas);
@@ -126,22 +124,23 @@ function CampanhasController() {
       const { id } = req.params;
       const { usuario_id, role } = req.user;
       
-      if (role !== 'empresa' && role !== 'cdl' && role !== 'admin') {
-        return res.status(403).json({ error: 'Não autorizado' });
-      }
-      
       const campanhaExistente = await campanhasRepository.buscarPorId(id);
       
+      // Verificar permissão
       if (role === 'empresa' && campanhaExistente.empresa_id !== usuario_id) {
         return res.status(403).json({ error: 'Você só pode atualizar suas próprias campanhas' });
       }
       
       if (role === 'cdl') {
         // Verificar se a campanha é da CDL ou de alguma loja dela
-        const empresa = await require('../repositories/usuariosRepository').buscarUsuarioPorId(campanhaExistente.empresa_id);
-        if (empresa.empresa_pai_id !== usuario_id && campanhaExistente.empresa_id !== usuario_id) {
+        const empresa = await usuariosRepository.buscarUsuarioPorId(campanhaExistente.empresa_id);
+        if (empresa.cdl_id !== usuario_id && campanhaExistente.empresa_id !== usuario_id) {
           return res.status(403).json({ error: 'Você só pode atualizar campanhas suas ou das suas lojas' });
         }
+      }
+      
+      if (role !== 'admin' && role !== 'cdl' && role !== 'empresa') {
+        return res.status(403).json({ error: 'Não autorizado' });
       }
       
       const { titulo, descricao, imagem_base64, produtos, recompensas, data_inicio, data_fim, ativa } = req.body;
@@ -185,21 +184,22 @@ function CampanhasController() {
       const { id } = req.params;
       const { usuario_id, role } = req.user;
       
-      if (role !== 'empresa' && role !== 'cdl' && role !== 'admin') {
-        return res.status(403).json({ error: 'Não autorizado' });
-      }
-      
       const campanha = await campanhasRepository.buscarPorId(id);
       
+      // Verificar permissão
       if (role === 'empresa' && campanha.empresa_id !== usuario_id) {
         return res.status(403).json({ error: 'Você só pode excluir suas próprias campanhas' });
       }
       
       if (role === 'cdl') {
-        const empresa = await require('../repositories/usuariosRepository').buscarUsuarioPorId(campanha.empresa_id);
-        if (empresa.empresa_pai_id !== usuario_id && campanha.empresa_id !== usuario_id) {
+        const empresa = await usuariosRepository.buscarUsuarioPorId(campanha.empresa_id);
+        if (empresa.cdl_id !== usuario_id && campanha.empresa_id !== usuario_id) {
           return res.status(403).json({ error: 'Você só pode excluir campanhas suas ou das suas lojas' });
         }
+      }
+      
+      if (role !== 'admin' && role !== 'cdl' && role !== 'empresa') {
+        return res.status(403).json({ error: 'Não autorizado' });
       }
       
       await campanhasRepository.excluir(id);
