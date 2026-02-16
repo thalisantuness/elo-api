@@ -1,81 +1,19 @@
 const produtoRepo = require('../repositories/produtoRepository');
 const usuariosRepo = require('../repositories/usuariosRepository');
-const sharp = require('sharp');
-const s3 = require('../utils/awsConfig');
-const { v4: uuidv4 } = require('uuid');
+const imageUpload = require('../utils/imageUpload');
 const { Op } = require('sequelize');
 
+/** Opções padrão de upload para produtos (foto principal e secundárias). */
+const OPCOES_IMAGEM_PRODUTO = { maxWidth: 800, maxHeight: 800, quality: 80 };
+
 function ProdutoController() {
-  function validateBase64Image(base64String) {
-    if (!base64String || typeof base64String !== 'string') {
-      throw new Error('String base64 inválida');
-    }
-
-    if (!base64String.startsWith('data:image/')) {
-      throw new Error('String não é uma imagem base64 válida');
-    }
-
-    const parts = base64String.split(',');
-    if (parts.length !== 2) {
-      throw new Error('Formato base64 inválido');
-    }
-
-    const base64Data = parts[1];
-    if (!base64Data || base64Data.length < 100) {
-      throw new Error('Dados de imagem base64 muito pequenos ou vazios');
-    }
-
-    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/;
-    if (!base64Regex.test(base64Data)) {
-      throw new Error('Dados base64 contêm caracteres inválidos');
-    }
-
-    return base64Data;
-  }
-
-  async function compressImage(buffer) {
-    try {
-      if (!buffer || buffer.length === 0) {
-        throw new Error('Buffer de imagem vazio');
-      }
-
-      const metadata = await sharp(buffer).metadata();
-      console.log('Metadata da imagem:', metadata);
-      
-      if (!metadata.format) {
-        throw new Error('Formato de imagem não suportado');
-      }
-      
-      return await sharp(buffer)
-        .resize(800, 800, { 
-          fit: 'inside',
-          withoutEnlargement: true 
-        })
-        .jpeg({ quality: 80 })
-        .toBuffer();
-    } catch (error) {
-      console.error('Erro ao comprimir imagem:', error.message);
-      throw new Error(`Erro ao processar imagem: ${error.message}`);
-    }
-  }
-
-  async function uploadToS3(buffer, folder) {
-    try {
-      const key = `${folder}/${uuidv4()}.jpg`;
-      const result = await s3.upload({ 
-        Bucket: process.env.AWS_BUCKET_NAME, 
-        Key: key, 
-        Body: buffer, 
-        ContentType: 'image/jpeg',
-        ACL: 'public-read'
-      }).promise();
-      
-      console.log(`✅ Upload realizado com sucesso: ${result.Location}`);
-      return result.Location;
-    } catch (error) {
-      console.error('❌ Erro no upload para S3:', error.message);
-      throw error;
-    }
+  /**
+   * Retorna a string base64 da foto principal do body.
+   * Aceita imagem_base64 ou foto_principal (padrão do frontend).
+   */
+  function getFotoPrincipalBase64(body) {
+    const v = body.imagem_base64 || body.foto_principal;
+    return v && typeof v === 'string' && v.startsWith('data:image') ? v : null;
   }
 
   async function listar(req, res) {
@@ -133,9 +71,9 @@ function ProdutoController() {
     try {
       const { 
         nome, valor, tipo_comercializacao, tipo_produto, 
-        imagem_base64,  // <-- CORRIGIDO: usar imagem_base64
         fotos_secundarias, valor_custo, quantidade, empresa_id 
       } = req.body;
+      const imagemPrincipalBase64 = getFotoPrincipalBase64(req.body);
 
       if (!req.user) {
         return res.status(401).json({ error: 'Autenticação necessária para criar produto' });
@@ -178,18 +116,16 @@ function ProdutoController() {
         empresa_id: empresaIdFinal
       };
 
-      // Processar imagem_base64 (NÃO foto_principal)
-      if (imagem_base64 && imagem_base64.startsWith('data:image')) {
+      // Processar foto principal (aceita imagem_base64 ou foto_principal no body)
+      if (imagemPrincipalBase64) {
         try {
-          console.log('📸 Processando imagem_base64...');
-          const base64Data = validateBase64Image(imagem_base64);
-          const buffer = Buffer.from(base64Data, 'base64');
-          const compressed = await compressImage(buffer);
-          const url = await uploadToS3(compressed, 'produtos/principal');
-          dados.foto_principal = url; // Salva a URL no campo foto_principal
-          console.log('✅ Foto principal salva:', url);
+          dados.foto_principal = await imageUpload.uploadImageFromBase64(
+            imagemPrincipalBase64,
+            'produtos/principal',
+            OPCOES_IMAGEM_PRODUTO
+          );
         } catch (error) {
-          console.error('❌ Erro no upload:', error.message);
+          console.error('❌ Erro no upload da foto principal:', error.message);
           return res.status(400).json({ 
             error: `Erro ao processar imagem: ${error.message}`
           });
@@ -204,12 +140,12 @@ function ProdutoController() {
         for (const base64 of fotos_secundarias) {
           if (base64 && base64.startsWith('data:image')) {
             try {
-              const base64Data = validateBase64Image(base64);
-              const buf = Buffer.from(base64Data, 'base64');
-              const comp = await compressImage(buf);
-              const url = await uploadToS3(comp, 'produtos/secundarias');
+              const url = await imageUpload.uploadImageFromBase64(
+                base64,
+                'produtos/secundarias',
+                OPCOES_IMAGEM_PRODUTO
+              );
               await produtoRepo.adicionarFoto(produto.produto_id, url);
-              console.log('✅ Foto secundária salva:', url);
             } catch (error) {
               console.error('❌ Erro em foto secundária:', error.message);
             }
@@ -240,22 +176,26 @@ function ProdutoController() {
         return res.status(403).json({ error: 'Você não tem permissão para atualizar este produto' });
       }
 
-      // Processar imagem_base64 se fornecida
-      if (dados.imagem_base64 && dados.imagem_base64.startsWith('data:image')) {
+      // Processar foto principal se fornecida (aceita imagem_base64 ou foto_principal em base64)
+      const novaFotoPrincipalBase64 = getFotoPrincipalBase64(dados);
+      if (novaFotoPrincipalBase64) {
         try {
-          console.log('📸 Atualizando imagem...');
-          const base64Data = validateBase64Image(dados.imagem_base64);
-          const buffer = Buffer.from(base64Data, 'base64');
-          const compressed = await compressImage(buffer);
-          const url = await uploadToS3(compressed, 'produtos/principal');
-          dados.foto_principal = url;
-          delete dados.imagem_base64; // Remove o campo temporário
+          dados.foto_principal = await imageUpload.uploadImageFromBase64(
+            novaFotoPrincipalBase64,
+            'produtos/principal',
+            OPCOES_IMAGEM_PRODUTO
+          );
         } catch (error) {
-          console.error('❌ Erro no upload:', error.message);
+          console.error('❌ Erro no upload da foto principal:', error.message);
           return res.status(400).json({ 
             error: `Erro ao processar imagem: ${error.message}`
           });
         }
+      }
+      // Não enviar base64 para o repositório (apenas URL ou nada)
+      delete dados.imagem_base64;
+      if (typeof dados.foto_principal === 'string' && dados.foto_principal.startsWith('data:image')) {
+        delete dados.foto_principal; // era base64 e deu erro antes; não sobrescrever com lixo
       }
 
       const produtoAtualizado = await produtoRepo.atualizarProduto(id, dados);
@@ -306,11 +246,11 @@ function ProdutoController() {
       }
       
       try {
-        const base64Data = validateBase64Image(imageBase64);
-        const buf = Buffer.from(base64Data, 'base64');
-        const comp = await compressImage(buf);
-        const url = await uploadToS3(comp, 'produtos/secundarias');
-        
+        const url = await imageUpload.uploadImageFromBase64(
+          imageBase64,
+          'produtos/secundarias',
+          OPCOES_IMAGEM_PRODUTO
+        );
         const foto = await produtoRepo.adicionarFoto(id, url);
         res.status(201).json(foto);
       } catch (error) {

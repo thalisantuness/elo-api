@@ -1,57 +1,11 @@
 const { Campanha } = require('../model/Campanha');
 const { Usuario } = require('../model/Usuarios');
 const sequelize = require("../utils/db");
-const s3 = require("../utils/awsConfig");
-const { v4: uuidv4 } = require("uuid");
-const sharp = require("sharp");
-const { Op } = require('sequelize'); // IMPORTANTE: Adicionar esta linha!
+const imageUpload = require("../utils/imageUpload");
+const { Op } = require('sequelize');
 
-// ==================== FUNÇÕES DE UPLOAD ====================
-
-async function deleteFromS3(fileUrl) {
-  if (!fileUrl || !fileUrl.includes(process.env.AWS_BUCKET_NAME)) {
-    console.log("URL inválida ou não pertence ao bucket. Nenhuma ação de exclusão tomada.");
-    return;
-  }
-  try {
-    const key = fileUrl.split('.com/')[1];
-    await s3.deleteObject({
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: key,
-    }).promise();
-    console.log(`Arquivo deletado do S3: ${key}`);
-  } catch (error) {
-    console.error("Erro ao deletar arquivo do S3:", error);
-  }
-}
-
-async function uploadToS3(base64Image, folder) {
-  if (!base64Image || !base64Image.startsWith('data:image')) {
-    throw new Error('Formato de imagem Base64 inválido');
-  }
-  try {
-    const buffer = Buffer.from(base64Image.split(',')[1], 'base64');
-    const compressedBuffer = await sharp(buffer)
-      .resize(1200, 630, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 85 })
-      .toBuffer();
-
-    const key = `${folder}/${uuidv4()}.jpg`;
-    const uploadResult = await s3.upload({
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: key,
-      Body: compressedBuffer,
-      ContentType: 'image/jpeg',
-      ACL: 'public-read'
-    }).promise();
-
-    console.log(`Upload realizado com sucesso: ${uploadResult.Location}`);
-    return uploadResult.Location;
-  } catch (error) {
-    console.error('Erro ao fazer upload para o S3:', error);
-    throw new Error('Falha no upload da imagem');
-  }
-}
+/** Opções de imagem para campanhas (banner 1200x630, quality 85). */
+const OPCOES_IMAGEM_CAMPANHA = { maxWidth: 1200, maxHeight: 630, quality: 85 };
 
 // ==================== FUNÇÕES DE CAMPANHA ====================
 
@@ -67,8 +21,11 @@ async function criar(dados) {
     
     if (imagem_base64 && imagem_base64.startsWith('data:image')) {
       try {
-        imagem_url = await uploadToS3(imagem_base64, 'campanhas');
-        console.log('Imagem da campanha enviada para S3:', imagem_url);
+        imagem_url = await imageUpload.uploadImageFromBase64(
+          imagem_base64,
+          'campanhas',
+          OPCOES_IMAGEM_CAMPANHA
+        );
       } catch (uploadError) {
         console.error('Erro no upload da imagem:', uploadError);
         throw new Error(`Erro ao processar imagem da campanha: ${uploadError.message}`);
@@ -214,12 +171,16 @@ async function atualizar(id, dados) {
     
     if (imagem_base64 && imagem_base64.startsWith('data:image')) {
       if (campanha.imagem_url && campanha.imagem_url.includes(process.env.AWS_BUCKET_NAME)) {
-        await deleteFromS3(campanha.imagem_url);
+        await imageUpload.deleteFromS3(campanha.imagem_url);
       }
-      atualizacao.imagem_url = await uploadToS3(imagem_base64, 'campanhas');
+      atualizacao.imagem_url = await imageUpload.uploadImageFromBase64(
+        imagem_base64,
+        'campanhas',
+        OPCOES_IMAGEM_CAMPANHA
+      );
     } else if (imagem_base64 === null) {
       if (campanha.imagem_url && campanha.imagem_url.includes(process.env.AWS_BUCKET_NAME)) {
-        await deleteFromS3(campanha.imagem_url);
+        await imageUpload.deleteFromS3(campanha.imagem_url);
       }
       atualizacao.imagem_url = null;
     }
@@ -242,7 +203,7 @@ async function excluir(id) {
     }
     
     if (campanha.imagem_url && campanha.imagem_url.includes(process.env.AWS_BUCKET_NAME)) {
-      await deleteFromS3(campanha.imagem_url);
+      await imageUpload.deleteFromS3(campanha.imagem_url);
     }
     
     await Campanha.destroy({ 

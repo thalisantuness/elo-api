@@ -3,56 +3,7 @@ const { Regra } = require('../model/Regra');
 const bcrypt = require('bcrypt');
 const { Op } = require('sequelize');
 const sequelize = require("../utils/db");
-const s3 = require("../utils/awsConfig");
-const { v4: uuidv4 } = require("uuid");
-const sharp = require("sharp");
-
-// ==================== FUNÇÕES DE UPLOAD ====================
-
-async function deleteFromS3(fileUrl) {
-  if (!fileUrl || !fileUrl.includes(process.env.AWS_BUCKET_NAME)) {
-    console.log("URL inválida ou não pertence ao bucket. Nenhuma ação de exclusão tomada.");
-    return;
-  }
-  try {
-    const key = fileUrl.split('.com/')[1];
-    await s3.deleteObject({
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: key,
-    }).promise();
-    console.log(`Arquivo deletado do S3: ${key}`);
-  } catch (error) {
-    console.error("Erro ao deletar arquivo do S3:", error);
-  }
-}
-
-async function uploadToS3(base64Image, folder) {
-  if (!base64Image || !base64Image.startsWith('data:image')) {
-    throw new Error('Formato de imagem Base64 inválido');
-  }
-  try {
-    const buffer = Buffer.from(base64Image.split(',')[1], 'base64');
-    const compressedBuffer = await sharp(buffer)
-      .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 80 })
-      .toBuffer();
-
-    const key = `${folder}/${uuidv4()}.jpg`;
-    const uploadResult = await s3.upload({
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: key,
-      Body: compressedBuffer,
-      ContentType: 'image/jpeg',
-      ACL: 'public-read'
-    }).promise();
-
-    console.log(`Upload realizado com sucesso: ${uploadResult.Location}`);
-    return uploadResult.Location;
-  } catch (error) {
-    console.error('Erro ao fazer upload para o S3:', error);
-    throw new Error('Falha no upload da imagem');
-  }
-}
+const imageUpload = require("../utils/imageUpload");
 
 // ==================== FUNÇÕES DE USUÁRIO ====================
 
@@ -65,8 +16,7 @@ async function criarUsuario(dados) {
     
     if (fotoPerfilBase64 && fotoPerfilBase64.startsWith('data:image')) {
       try {
-        foto_perfil = await uploadToS3(fotoPerfilBase64, 'usuarios/perfil');
-        console.log('Foto de perfil enviada para S3:', foto_perfil);
+        foto_perfil = await imageUpload.uploadImageFromBase64(fotoPerfilBase64, 'usuarios/perfil');
       } catch (uploadError) {
         console.error('Erro no upload da foto:', uploadError);
         throw new Error(`Erro ao processar foto de perfil: ${uploadError.message}`);
@@ -141,7 +91,7 @@ async function atualizarUsuario(id, dados) {
 async function deletarUsuario(id) {
   const usuario = await Usuario.findByPk(id);
   if (usuario && usuario.foto_perfil && usuario.foto_perfil.includes(process.env.AWS_BUCKET_NAME)) {
-    await deleteFromS3(usuario.foto_perfil);
+    await imageUpload.deleteFromS3(usuario.foto_perfil);
   }
   return Usuario.destroy({ where: { usuario_id: id } });
 }
@@ -173,10 +123,10 @@ async function atualizarFotoPerfil(usuarioId, imageBase64) {
 
     const oldFileUrl = usuario.foto_perfil;
     if (oldFileUrl && oldFileUrl.includes(process.env.AWS_BUCKET_NAME)) {
-      await deleteFromS3(oldFileUrl);
+      await imageUpload.deleteFromS3(oldFileUrl);
     }
 
-    const newFileUrl = await uploadToS3(imageBase64, 'usuarios/perfil');
+    const newFileUrl = await imageUpload.uploadImageFromBase64(imageBase64, 'usuarios/perfil');
 
     usuario.foto_perfil = newFileUrl;
     await usuario.save({ transaction: t });
