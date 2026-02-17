@@ -12,6 +12,25 @@ function recompensasController() {
     }
   }
 
+  /** Busca uma recompensa por ID (para preencher formulário de edição). Apenas o dono ou admin. */
+  async function buscarRecompensaPorId(req, res) {
+    try {
+      const recom_id = req.params.recom_id || req.params.id;
+      const usuario_id = req.user.usuario_id;
+      const recompensa = await recompensasRepository.buscarRecompensaPorId(recom_id);
+      if (recompensa.usuario_id !== usuario_id && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Você não tem permissão para acessar esta recompensa' });
+      }
+      res.json(recompensa);
+    } catch (error) {
+      if (error.message.includes('não encontrada')) {
+        return res.status(404).json({ error: error.message });
+      }
+      console.error('Erro ao buscar recompensa:', error);
+      res.status(500).json({ error: 'Erro ao buscar recompensa' });
+    }
+  }
+
   async function cadastrarRecompensas(req, res) {
     try {
       const { nome, descricao, imagem_base64, pontos, estoque } = req.body;
@@ -58,7 +77,7 @@ function recompensasController() {
 
   async function atualizarRecompensas(req, res) {
     try {
-      const { recom_id } = req.params;
+      const recom_id = req.params.recom_id || req.params.id;
       const { nome, descricao, imagem_base64, pontos, estoque } = req.body;
       
       // Validar imagem se fornecida (igual ao usuário)
@@ -92,7 +111,7 @@ function recompensasController() {
 
   async function excluirRecom(req, res) {
     try {
-      const { recom_id } = req.params;
+      const recom_id = req.params.recom_id || req.params.id;
       await recompensasRepository.excluirRecompensa(recom_id);
       res.json({ message: `Recompensa ${recom_id} excluída com sucesso` });
     } catch (error) {
@@ -103,6 +122,7 @@ function recompensasController() {
 
   return {
     visualizarRecompensas,
+    buscarRecompensaPorId,
     cadastrarRecompensas,
     atualizarRecompensas,
     excluirRecom,

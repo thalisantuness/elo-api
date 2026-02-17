@@ -105,8 +105,13 @@ router.delete('/produtos/:id/fotos/:fotoId', produtoController.deletarFoto);
 
 router.post('/recompensas', recompensasController.cadastrarRecompensas);
 router.get('/recompensas', recompensasController.visualizarRecompensas);
+router.get('/recompensas/:recom_id', recompensasController.buscarRecompensaPorId);
 router.put('/recompensas/:recom_id', recompensasController.atualizarRecompensas);
 router.delete('/recompensas/:recom_id', recompensasController.excluirRecom);
+
+// Alias para edição (frontend pode usar /editar-recompensa/:id)
+router.get('/editar-recompensa/:id', recompensasController.buscarRecompensaPorId);
+router.put('/editar-recompensa/:id', recompensasController.atualizarRecompensas);
 
 // ==================== ROTAS DE SOLICITAÇÕES ====================
 
