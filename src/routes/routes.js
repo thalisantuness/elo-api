@@ -66,8 +66,9 @@ router.use(authMiddleware);
 router.get('/usuarios', usuariosController.listar);
 router.get('/usuarios/:id', usuariosController.buscarPorId);
 
-// Gerenciamento de perfil
+// Gerenciamento de perfil (editar dados: PATCH /perfil ou PUT /usuarios/:id)
 router.patch('/usuarios/:id/perfil', usuariosController.atualizarPerfil);
+router.put('/usuarios/:id', usuariosController.atualizarPerfil);
 router.patch('/usuarios/:id/senha', usuariosController.alterarSenha);
 router.patch('/usuarios/:id/foto', usuariosController.atualizarFotoPerfil);
 router.delete('/usuarios/:id', usuariosController.deletar);
