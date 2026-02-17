@@ -129,6 +129,10 @@ router.get('/campanhas/:id', campanhasController.buscarPorId);
 router.put('/campanhas/:id', campanhasController.atualizar);
 router.delete('/campanhas/:id', campanhasController.excluir);
 
+// Alias para edição (frontend pode usar /editar-campanha/:id)
+router.get('/editar-campanha/:id', campanhasController.buscarPorId);
+router.put('/editar-campanha/:id', campanhasController.atualizar);
+
 // ==================== ROTAS DE COMPRAS ====================
 
 router.get('/compras', comprasController.listarCompras);
