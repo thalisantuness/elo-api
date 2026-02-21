@@ -147,21 +147,25 @@ async function listarUsuariosComFiltros(usuarioLogado, filtros = {}) {
     case 'admin':
       break;
       
-    case 'cdl':
-      whereClause[Op.or] = [
+    case 'cdl': {
+      const empresasDaCdl = await Usuario.findAll({
+        where: { role: 'empresa', cdl_id: usuario_id },
+        attributes: ['usuario_id']
+      });
+      const idsEmpresas = empresasDaCdl.map(e => e.usuario_id);
+
+      const condicoesCdl = [
         { role: 'empresa', cdl_id: usuario_id },
         { role: 'cliente', cdl_id: usuario_id },
-        {
-          role: 'empresa-funcionario',
-          cdl_id: {
-            [Op.in]: sequelize.literal(`(
-              SELECT usuario_id FROM usuarios
-              WHERE role = 'empresa' AND cdl_id = ${usuario_id}
-            )`)
-          }
-        }
       ];
+
+      if (idsEmpresas.length > 0) {
+        condicoesCdl.push({ role: 'empresa-funcionario', cdl_id: { [Op.in]: idsEmpresas } });
+      }
+
+      whereClause[Op.or] = condicoesCdl;
       break;
+    }
       
     case 'empresa':
       whereClause = {
