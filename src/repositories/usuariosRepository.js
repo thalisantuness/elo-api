@@ -170,6 +170,7 @@ async function listarUsuariosComFiltros(usuarioLogado, filtros = {}) {
     case 'empresa':
       whereClause = {
         [Op.or]: [
+          { role: 'cliente', cdl_id: usuario_id },
           {
             role: 'cliente',
             usuario_id: {
