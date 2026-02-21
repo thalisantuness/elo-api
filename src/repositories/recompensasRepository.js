@@ -21,7 +21,7 @@ async function listarRecompensas(usuario_id, role) {
 
   if (role === 'admin') {
     // sem filtro
-  } else if (role === 'empresa') {
+  } else if (role === 'empresa' || role === 'cdl') {
     whereClause.usuario_id = usuario_id;
   } else if (role === 'empresa-funcionario') {
     const funcionario = await Usuario.findByPk(usuario_id);
