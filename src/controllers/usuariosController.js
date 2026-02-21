@@ -58,9 +58,9 @@ function UsuarioController() {
         cdlIdFinal = req.user.usuario_id;
       }
 
-      else if (req.user && req.user.role === 'cdl' && role !== 'empresa') {
+      else if (req.user && req.user.role === 'cdl' && role !== 'empresa' && role !== 'cliente') {
         return res.status(403).json({
-          error: "CDL só pode criar usuários com role = empresa"
+          error: "CDL só pode criar usuários com role = empresa ou cliente"
         });
       }
 
