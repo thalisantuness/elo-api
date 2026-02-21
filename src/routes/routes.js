@@ -32,7 +32,7 @@ const comprasController = ComprasController();
 
 
 router.post('/login', usuariosController.logar);
-router.post('/usuarios', usuariosController.cadastrar);
+router.post('/usuarios', optionalAuth, usuariosController.cadastrar);
 router.get('/cdls', usuariosController.listarCdls);
 router.get('/cdls/:cdl_id/lojas', usuariosController.listarLojasDaCdl);
 
