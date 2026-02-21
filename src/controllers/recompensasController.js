@@ -45,8 +45,8 @@ function recompensasController() {
       const { nome, descricao, imagem_base64, pontos, estoque } = req.body;
       const { usuario_id, role } = req.user;
 
-      if (role !== 'empresa' && role !== 'admin') {
-        return res.status(403).json({ error: 'Apenas empresas e administradores podem cadastrar recompensas' });
+      if (role !== 'empresa' && role !== 'admin' && role !== 'cdl') {
+        return res.status(403).json({ error: 'Apenas empresas, CDLs e administradores podem cadastrar recompensas' });
       }
 
       if (!nome) {
@@ -89,12 +89,12 @@ function recompensasController() {
       const { nome, descricao, imagem_base64, pontos, estoque } = req.body;
       const { usuario_id, role } = req.user;
 
-      if (role !== 'empresa' && role !== 'admin') {
-        return res.status(403).json({ error: 'Apenas empresas e administradores podem atualizar recompensas' });
+      if (role !== 'empresa' && role !== 'admin' && role !== 'cdl') {
+        return res.status(403).json({ error: 'Apenas empresas, CDLs e administradores podem atualizar recompensas' });
       }
 
       const recompensa = await recompensasRepository.buscarRecompensaPorId(recom_id);
-      if (role === 'empresa' && recompensa.usuario_id !== usuario_id) {
+      if ((role === 'empresa' || role === 'cdl') && recompensa.usuario_id !== usuario_id) {
         return res.status(403).json({ error: 'Você só pode atualizar suas próprias recompensas' });
       }
 
@@ -131,12 +131,12 @@ function recompensasController() {
       const recom_id = req.params.recom_id || req.params.id;
       const { usuario_id, role } = req.user;
 
-      if (role !== 'empresa' && role !== 'admin') {
-        return res.status(403).json({ error: 'Apenas empresas e administradores podem excluir recompensas' });
+      if (role !== 'empresa' && role !== 'admin' && role !== 'cdl') {
+        return res.status(403).json({ error: 'Apenas empresas, CDLs e administradores podem excluir recompensas' });
       }
 
       const recompensa = await recompensasRepository.buscarRecompensaPorId(recom_id);
-      if (role === 'empresa' && recompensa.usuario_id !== usuario_id) {
+      if ((role === 'empresa' || role === 'cdl') && recompensa.usuario_id !== usuario_id) {
         return res.status(403).json({ error: 'Você só pode excluir suas próprias recompensas' });
       }
 
