@@ -54,7 +54,7 @@ function UsuarioController() {
 
       let cdlIdFinal = cdl_id || null;
 
-      if (req.user && req.user.role === 'cdl' && role === 'empresa') {
+      if (req.user && req.user.role === 'cdl' && (role === 'empresa' || role === 'cliente')) {
         cdlIdFinal = req.user.usuario_id;
       }
 
