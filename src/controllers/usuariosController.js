@@ -64,13 +64,13 @@ function UsuarioController() {
         });
       }
 
-      else if (req.user && req.user.role === 'empresa' && role === 'empresa-funcionario') {
+      else if (req.user && req.user.role === 'empresa' && (role === 'empresa-funcionario' || role === 'cliente')) {
         cdlIdFinal = req.user.usuario_id;
       }
 
-      else if (req.user && req.user.role === 'empresa' && role !== 'empresa-funcionario') {
+      else if (req.user && req.user.role === 'empresa' && role !== 'empresa-funcionario' && role !== 'cliente') {
         return res.status(403).json({
-          error: "Empresa só pode criar usuários com role = empresa-funcionario"
+          error: "Empresa só pode criar usuários com role = empresa-funcionario ou cliente"
         });
       }
       
