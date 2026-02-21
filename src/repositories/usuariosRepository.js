@@ -151,19 +151,32 @@ async function listarUsuariosComFiltros(usuarioLogado, filtros = {}) {
       whereClause[Op.or] = [
         { role: 'empresa', cdl_id: usuario_id },
         { role: 'cliente', cdl_id: usuario_id },
-        { role: 'empresa-funcionario', cdl_id: usuario_id }
+        {
+          role: 'empresa-funcionario',
+          cdl_id: {
+            [Op.in]: sequelize.literal(`(
+              SELECT usuario_id FROM usuarios
+              WHERE role = 'empresa' AND cdl_id = ${usuario_id}
+            )`)
+          }
+        }
       ];
       break;
       
     case 'empresa':
       whereClause = {
-        role: 'cliente',
-        usuario_id: {
-          [Op.in]: sequelize.literal(`(
-            SELECT DISTINCT cliente_id FROM compras 
-            WHERE empresa_id = ${usuario_id} AND cliente_id IS NOT NULL
-          )`)
-        }
+        [Op.or]: [
+          {
+            role: 'cliente',
+            usuario_id: {
+              [Op.in]: sequelize.literal(`(
+                SELECT DISTINCT cliente_id FROM compras
+                WHERE empresa_id = ${usuario_id} AND cliente_id IS NOT NULL
+              )`)
+            }
+          },
+          { role: 'empresa-funcionario', cdl_id: usuario_id }
+        ]
       };
       break;
       

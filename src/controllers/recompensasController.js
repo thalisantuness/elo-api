@@ -3,12 +3,21 @@ const recompensasRepository = require('../repositories/recompensasRepository');
 function recompensasController() {
   async function visualizarRecompensas(req, res) {
     try {
-      const usuario_id = req.user.usuario_id;
-      const recompensas = await recompensasRepository.listarRecompensas(usuario_id);
+      const { usuario_id, role } = req.user;
+      const recompensas = await recompensasRepository.listarRecompensas(usuario_id, role);
+
+      if (recompensas.length === 0) {
+        if (role === 'cliente') {
+          return res.json({ message: 'Nenhuma recompensa disponível para sua CDL no momento', recompensas: [] });
+        } else if (role === 'empresa' || role === 'empresa-funcionario') {
+          return res.json({ message: 'Você ainda não cadastrou nenhuma recompensa', recompensas: [] });
+        }
+      }
+
       res.json(recompensas);
     } catch (error) {
       console.error('Erro ao obter recompensas:', error);
-      res.status(500).json({ error: 'Erro ao obter recompensas' });
+      res.status(error.message.includes('não autorizado') ? 403 : 500).json({ error: error.message });
     }
   }
 
@@ -34,17 +43,16 @@ function recompensasController() {
   async function cadastrarRecompensas(req, res) {
     try {
       const { nome, descricao, imagem_base64, pontos, estoque } = req.body;
-      const usuario_id = req.user.usuario_id;
-      
-      if (!usuario_id) {
-        return res.status(400).json({ error: 'ID de usuário não encontrado' });
+      const { usuario_id, role } = req.user;
+
+      if (role !== 'empresa' && role !== 'admin') {
+        return res.status(403).json({ error: 'Apenas empresas e administradores podem cadastrar recompensas' });
       }
 
       if (!nome) {
         return res.status(400).json({ error: 'Nome da recompensa é obrigatório' });
       }
 
-      // Validar imagem se fornecida (igual ao usuário)
       if (imagem_base64) {
         if (!imagem_base64.startsWith('data:image')) {
           return res.status(400).json({ 
@@ -79,8 +87,17 @@ function recompensasController() {
     try {
       const recom_id = req.params.recom_id || req.params.id;
       const { nome, descricao, imagem_base64, pontos, estoque } = req.body;
-      
-      // Validar imagem se fornecida (igual ao usuário)
+      const { usuario_id, role } = req.user;
+
+      if (role !== 'empresa' && role !== 'admin') {
+        return res.status(403).json({ error: 'Apenas empresas e administradores podem atualizar recompensas' });
+      }
+
+      const recompensa = await recompensasRepository.buscarRecompensaPorId(recom_id);
+      if (role === 'empresa' && recompensa.usuario_id !== usuario_id) {
+        return res.status(403).json({ error: 'Você só pode atualizar suas próprias recompensas' });
+      }
+
       if (imagem_base64 && !imagem_base64.startsWith('data:image') && imagem_base64 !== null) {
         return res.status(400).json({ 
           error: "Formato inválido para a imagem (deve ser base64 'data:image/...' ou null)" 
@@ -112,6 +129,17 @@ function recompensasController() {
   async function excluirRecom(req, res) {
     try {
       const recom_id = req.params.recom_id || req.params.id;
+      const { usuario_id, role } = req.user;
+
+      if (role !== 'empresa' && role !== 'admin') {
+        return res.status(403).json({ error: 'Apenas empresas e administradores podem excluir recompensas' });
+      }
+
+      const recompensa = await recompensasRepository.buscarRecompensaPorId(recom_id);
+      if (role === 'empresa' && recompensa.usuario_id !== usuario_id) {
+        return res.status(403).json({ error: 'Você só pode excluir suas próprias recompensas' });
+      }
+
       await recompensasRepository.excluirRecompensa(recom_id);
       res.json({ message: `Recompensa ${recom_id} excluída com sucesso` });
     } catch (error) {

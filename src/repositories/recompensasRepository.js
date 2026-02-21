@@ -1,17 +1,55 @@
 const { Recompensas } = require('../model/Recompensas');
+const { Usuario } = require('../model/Usuarios');
 const sequelize = require("../utils/db");
 const imageUpload = require("../utils/imageUpload");
+const { Op } = require("sequelize");
 
 /** Opções de imagem para recompensas (500x500, quality 85). */
 const OPCOES_IMAGEM_RECOMPENSA = { maxWidth: 500, maxHeight: 500, quality: 85 };
 
 // ==================== FUNÇÕES DE RECOMPENSA ====================
 
-async function listarRecompensas(usuario_id) {
-    return Recompensas.findAll({ 
-      where: { usuario_id },
-      order: [['data_cadastro', 'DESC']]
-    });
+/**
+ * Lista recompensas com filtro baseado no role do usuário logado.
+ * - admin: todas
+ * - empresa: as próprias
+ * - empresa-funcionario: as da empresa pai (cdl_id do funcionario)
+ * - cliente: as de todas as empresas da mesma CDL do cliente
+ */
+async function listarRecompensas(usuario_id, role) {
+  let whereClause = {};
+
+  if (role === 'admin') {
+    // sem filtro
+  } else if (role === 'empresa') {
+    whereClause.usuario_id = usuario_id;
+  } else if (role === 'empresa-funcionario') {
+    const funcionario = await Usuario.findByPk(usuario_id);
+    if (funcionario && funcionario.cdl_id) {
+      whereClause.usuario_id = funcionario.cdl_id;
+    } else {
+      return [];
+    }
+  } else if (role === 'cliente') {
+    const cliente = await Usuario.findByPk(usuario_id);
+    if (cliente && cliente.cdl_id) {
+      whereClause.usuario_id = {
+        [Op.in]: sequelize.literal(`(
+          SELECT usuario_id FROM usuarios
+          WHERE cdl_id = ${cliente.cdl_id} AND role = 'empresa' AND status = 'ativo'
+        )`)
+      };
+    } else {
+      return [];
+    }
+  } else {
+    throw new Error('Role não autorizado para visualizar recompensas');
+  }
+
+  return Recompensas.findAll({
+    where: whereClause,
+    order: [['data_cadastro', 'DESC']]
+  });
 }
 
 async function buscarRecompensaPorId(id) {
