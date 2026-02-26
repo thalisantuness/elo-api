@@ -144,6 +144,17 @@ const qrCodeBase64 = qrCodeResult.qr_code_image;
     }
   }
 
+  async function bigNumbers(req, res) {
+    const { usuario_id, role } = req.user;
+    try {
+      const dados = await compraRepository.getBigNumbers(role, usuario_id);
+      res.status(200).json(dados);
+    } catch (error) {
+      console.error('Erro ao buscar big numbers:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
   return {
     listarCompras,
     buscarCompraPorId,
@@ -152,6 +163,7 @@ const qrCodeBase64 = qrCodeResult.qr_code_image;
     atualizarCompra,
     excluirCompra,
     estatisticasEmpresa,
+    bigNumbers,
   };
 }
 

@@ -148,6 +148,7 @@ router.post('/compra', comprasController.claimCompra);
 router.put('/compras/:id', comprasController.atualizarCompra);
 router.delete('/compras/:id', comprasController.excluirCompra);
 router.get('/minhas-estatisticas', comprasController.estatisticasEmpresa);
+router.get('/big-numbers', comprasController.bigNumbers);
 
 // ==================== ROTAS DE CHAT ====================
 

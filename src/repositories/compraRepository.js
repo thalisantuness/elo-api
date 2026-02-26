@@ -1,6 +1,8 @@
 const { Compra } = require('../model/Compra');
 const { Usuario } = require('../model/Usuarios');
 const { Campanha } = require('../model/Campanha');
+const { SolicitacaoRecompensa } = require('../model/SolicitacaoRecompensa');
+const { Recompensas } = require('../model/Recompensas');
 const { Op } = require('sequelize');
 const sequelize = require('../utils/db');
 const crypto = require('crypto');
@@ -309,6 +311,187 @@ async function estatisticasEmpresa(empresa_id) {
   };
 }
 
+async function getBigNumbers(role, userId) {
+  // --- 1. Montar escopo de IDs por role ---
+  let empresaIds = null;
+  let cdlId = null;
+
+  if (role === 'cdl') {
+    cdlId = userId;
+    const empresas = await Usuario.findAll({
+      where: { role: 'empresa', cdl_id: userId },
+      attributes: ['usuario_id']
+    });
+    empresaIds = empresas.map(e => e.usuario_id);
+  } else if (role === 'empresa') {
+    empresaIds = [userId];
+  }
+
+  // --- 2. Construir cláusulas WHERE reutilizáveis ---
+  const compraValidadaWhere = { status: 'validada' };
+  const compraCriadaWhere = {};
+
+  if (role === 'empresa' || role === 'cdl') {
+    const empresaFiltro = { [Op.in]: empresaIds.length ? empresaIds : [-1] };
+    compraValidadaWhere.empresa_id = empresaFiltro;
+    compraCriadaWhere.empresa_id = empresaFiltro;
+  } else if (role === 'cliente') {
+    compraValidadaWhere.cliente_id = userId;
+    compraCriadaWhere.cliente_id = userId;
+  }
+
+  // Filtro de pontos usados (SolicitacaoRecompensa aceitas)
+  const solicitacaoWhere = { status: 'aceita' };
+  const recompensaWhere = {};
+  if (role === 'empresa' || role === 'cdl') {
+    recompensaWhere.usuario_id = { [Op.in]: empresaIds.length ? empresaIds : [-1] };
+  } else if (role === 'cliente') {
+    solicitacaoWhere.usuario_id = userId;
+  }
+
+  // Filtro de usuários por escopo
+  const usuarioClienteWhere = { role: 'cliente' };
+  const usuarioEmpresaWhere = { role: 'empresa', status: 'ativo' };
+  if (role === 'cdl') {
+    usuarioClienteWhere.cdl_id = userId;
+    usuarioEmpresaWhere.cdl_id = userId;
+  } else if (role === 'empresa') {
+    usuarioClienteWhere.cdl_id = null; // empresa não tem escopo direto de clientes
+  }
+
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  // --- 3. Executar todas as queries em paralelo ---
+  const [
+    comprasValidadasAgg,
+    comprasCriadasAgg,
+    totalComprasValidadas,
+    pontosUsadosAgg,
+    empresasAtivasNaSemana,
+    totalEmpresasEscopo,
+    totalClientes,
+    totalEmpresas,
+    totalCdls,
+    velocidadeResult,
+    densidadeResult
+  ] = await Promise.all([
+    // Valor escaneado + pontos gerados (compras validadas)
+    Compra.findOne({
+      where: compraValidadaWhere,
+      attributes: [
+        [sequelize.fn('COALESCE', sequelize.fn('SUM', sequelize.col('valor')), 0), 'valor_escaneadas'],
+        [sequelize.fn('COALESCE', sequelize.fn('SUM', sequelize.col('pontos_adquiridos')), 0), 'pontos_gerados']
+      ],
+      raw: true
+    }),
+    // Valor criado (todas as compras)
+    Compra.findOne({
+      where: compraCriadaWhere,
+      attributes: [
+        [sequelize.fn('COALESCE', sequelize.fn('SUM', sequelize.col('valor')), 0), 'valor_criadas']
+      ],
+      raw: true
+    }),
+    // Total de compras validadas (para ticket médio)
+    Compra.count({ where: compraValidadaWhere }),
+    // Pontos usados via SolicitacaoRecompensa aceitas
+    SolicitacaoRecompensa.findOne({
+      where: solicitacaoWhere,
+      include: [{
+        model: Recompensas,
+        as: 'recompensa',
+        attributes: [],
+        where: Object.keys(recompensaWhere).length ? recompensaWhere : undefined,
+        required: Object.keys(recompensaWhere).length > 0
+      }],
+      attributes: [
+        [sequelize.fn('COALESCE', sequelize.fn('SUM', sequelize.col('recompensa.pontos')), 0), 'total_pontos_usados']
+      ],
+      raw: true
+    }),
+    // Empresas que fizeram pelo menos uma leitura nos últimos 7 dias
+    Compra.count({
+      where: { ...compraValidadaWhere, validado_em: { [Op.gte]: sevenDaysAgo } },
+      distinct: true,
+      col: 'empresa_id'
+    }),
+    // Total de empresas no escopo (para taxa de atividade)
+    Usuario.count({ where: usuarioEmpresaWhere }),
+    // Clientes cadastrados
+    role === 'empresa' ? Promise.resolve(null) : Usuario.count({ where: usuarioClienteWhere }),
+    // Empresas cadastradas
+    role === 'empresa' ? Promise.resolve(1) : Usuario.count({ where: usuarioEmpresaWhere }),
+    // CDLs cadastradas (só faz sentido para admin)
+    role === 'admin' ? Usuario.count({ where: { role: 'cdl' } }) : Promise.resolve(null),
+    // Velocidade de adoção: AVG dias entre 1ª e 2ª compra por cliente
+    sequelize.query(`
+      SELECT ROUND(AVG(EXTRACT(EPOCH FROM (segunda - primeira)) / 86400)::numeric, 1) AS media_dias
+      FROM (
+        SELECT cliente_id,
+               MIN(validado_em) AS primeira,
+               MIN(CASE WHEN rn > 1 THEN validado_em END) AS segunda
+        FROM (
+          SELECT cliente_id, validado_em,
+                 ROW_NUMBER() OVER (PARTITION BY cliente_id ORDER BY validado_em) AS rn
+          FROM compras
+          WHERE status = 'validada'
+            AND cliente_id IS NOT NULL
+            ${role === 'empresa' || role === 'cdl' ? `AND empresa_id IN (${empresaIds.length ? empresaIds.join(',') : -1})` : ''}
+            ${role === 'cliente' ? `AND cliente_id = ${userId}` : ''}
+        ) ranked
+        GROUP BY cliente_id
+        HAVING COUNT(*) >= 2
+      ) tempos
+      WHERE segunda IS NOT NULL
+    `, { type: sequelize.QueryTypes.SELECT }),
+    // Densidade de rede: clientes que compraram em loja A e resgataram recompensa de loja B (A ≠ B)
+    sequelize.query(`
+      SELECT COUNT(DISTINCT c.cliente_id) AS quantidade
+      FROM compras c
+      JOIN solicitacao_recompensas sr ON c.cliente_id = sr.usuario_id
+      JOIN recompensas r ON sr.recom_id = r.recom_id
+      WHERE c.status = 'validada'
+        AND sr.status = 'aceita'
+        AND c.empresa_id <> r.usuario_id
+        ${role === 'empresa' || role === 'cdl' ? `AND c.empresa_id IN (${empresaIds.length ? empresaIds.join(',') : -1})` : ''}
+        ${role === 'cliente' ? `AND c.cliente_id = ${userId}` : ''}
+    `, { type: sequelize.QueryTypes.SELECT })
+  ]);
+
+  // --- 4. Montar e retornar resultado ---
+  const valorEscaneadas = parseFloat(comprasValidadasAgg?.valor_escaneadas) || 0;
+  const pontosGerados = parseInt(comprasValidadasAgg?.pontos_gerados) || 0;
+  const valorCriadas = parseFloat(comprasCriadasAgg?.valor_criadas) || 0;
+  const pontosUsados = parseInt(pontosUsadosAgg?.total_pontos_usados) || 0;
+  const totalCompras = totalComprasValidadas || 0;
+  const taxaAtividade = totalEmpresasEscopo > 0
+    ? parseFloat(((empresasAtivasNaSemana / totalEmpresasEscopo) * 100).toFixed(1))
+    : 0;
+  const clientesCadastrados = totalClientes ?? null;
+  const empresasCadastradas = totalEmpresas ?? 0;
+  const cdlsCadastradas = totalCdls ?? null;
+  const totalUsuarios = (clientesCadastrados ?? 0) + empresasCadastradas;
+  const ticketMedio = totalCompras > 0 ? parseFloat((valorEscaneadas / totalCompras).toFixed(2)) : 0;
+  const velocidadeAdocao = parseFloat(velocidadeResult[0]?.media_dias) || null;
+  const densidadeRede = parseInt(densidadeResult[0]?.quantidade) || 0;
+
+  return {
+    ircl: pontosUsados,
+    taxa_atividade_associados: taxaAtividade,
+    velocidade_adocao_dias: velocidadeAdocao,
+    densidade_rede: densidadeRede,
+    valor_em_compras_criadas: valorCriadas,
+    valor_em_compras_escaneadas: valorEscaneadas,
+    valor_em_pontos_gerados: pontosGerados,
+    valor_em_pontos_usados: pontosUsados,
+    clientes_cadastrados: clientesCadastrados,
+    empresas_cadastradas: empresasCadastradas,
+    cdls_cadastradas: cdlsCadastradas,
+    total_usuarios: totalUsuarios,
+    ticket_medio: ticketMedio
+  };
+}
+
 module.exports = {
   listarCompras,
   listarComprasPorEmpresa,
@@ -318,5 +501,6 @@ module.exports = {
   claimCompra,
   atualizarCompra,
   excluirCompra,
-  estatisticasEmpresa
+  estatisticasEmpresa,
+  getBigNumbers
 };
