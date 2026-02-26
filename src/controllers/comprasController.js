@@ -155,6 +155,23 @@ const qrCodeBase64 = qrCodeResult.qr_code_image;
     }
   }
 
+  async function graficosCdl(req, res) {
+    const { usuario_id, role } = req.user;
+
+    if (!['cdl', 'admin'].includes(role)) {
+      return res.status(403).json({ error: 'Apenas CDLs e admins podem acessar os gráficos' });
+    }
+
+    try {
+      const cdlId = (role === 'admin' && req.params.cdl_id) ? req.params.cdl_id : usuario_id;
+      const dados = await compraRepository.getGraficosCdl(cdlId);
+      res.status(200).json(dados);
+    } catch (error) {
+      console.error('Erro ao buscar gráficos da CDL:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
   return {
     listarCompras,
     buscarCompraPorId,
@@ -164,6 +181,7 @@ const qrCodeBase64 = qrCodeResult.qr_code_image;
     excluirCompra,
     estatisticasEmpresa,
     bigNumbers,
+    graficosCdl,
   };
 }
 

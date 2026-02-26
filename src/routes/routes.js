@@ -80,6 +80,10 @@ router.put('/cliente/:id/trocar-cdl', usuariosController.trocarCdlDoCliente);
 router.get('/minha-cdl/dashboard', usuariosController.getDashboardCdl);
 router.get('/admin/cdls/:cdl_id/dashboard', usuariosController.getDashboardCdl);
 
+// Gráficos da CDL
+router.get('/minha-cdl/graficos', comprasController.graficosCdl);
+router.get('/admin/cdls/:cdl_id/graficos', comprasController.graficosCdl);
+
 // ==================== ROTAS ADMINISTRATIVAS ====================
 
 router.get('/admin/usuarios', usuariosController.visualizarUsuario);

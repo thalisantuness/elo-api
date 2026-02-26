@@ -492,6 +492,169 @@ async function getBigNumbers(role, userId) {
   };
 }
 
+// ==================== HELPERS PRIVADOS ====================
+
+async function _getEmpresaIdsDaCdl(cdl_id) {
+  const empresas = await Usuario.findAll({
+    where: { role: 'empresa', cdl_id },
+    attributes: ['usuario_id']
+  });
+  return empresas.map(e => e.usuario_id);
+}
+
+function _calcularTendencia(valores) {
+  if (valores.length < 2) return 'estavel';
+  const ultimos = valores.slice(-3);
+  const primeiro = ultimos[0];
+  const ultimo = ultimos[ultimos.length - 1];
+  if (ultimo < primeiro * 0.95) return 'queda';
+  if (ultimo > primeiro * 1.05) return 'alta';
+  return 'estavel';
+}
+
+// ==================== GRÁFICOS CDL ====================
+
+async function getGraficosCdl(cdl_id) {
+  const empresaIds = await _getEmpresaIdsDaCdl(cdl_id);
+  const idsParam = empresaIds.length ? empresaIds.join(',') : -1;
+  const empresaFiltro = { [Op.in]: empresaIds.length ? empresaIds : [-1] };
+
+  const [
+    agregados,
+    pontosUsadosAgg,
+    totalClientes,
+    totalEmpresas,
+    comprasPorMesResult,
+    recorrenciaPorMesResult,
+    lojasAtivasResult
+  ] = await Promise.all([
+    // Valor escaneado + pontos gerados (compras validadas)
+    Compra.findOne({
+      where: { status: 'validada', empresa_id: empresaFiltro },
+      attributes: [
+        [sequelize.fn('COALESCE', sequelize.fn('SUM', sequelize.col('valor')), 0), 'valor_escaneadas'],
+        [sequelize.fn('COALESCE', sequelize.fn('SUM', sequelize.col('pontos_adquiridos')), 0), 'pontos_gerados']
+      ],
+      raw: true
+    }),
+    // Pontos usados via SolicitacaoRecompensa aceitas (recompensas das empresas da CDL)
+    SolicitacaoRecompensa.findOne({
+      where: { status: 'aceita' },
+      include: [{
+        model: Recompensas,
+        as: 'recompensa',
+        attributes: [],
+        where: { usuario_id: empresaFiltro },
+        required: true
+      }],
+      attributes: [
+        [sequelize.fn('COALESCE', sequelize.fn('SUM', sequelize.col('recompensa.pontos')), 0), 'total_pontos_usados']
+      ],
+      raw: true
+    }),
+    // Clientes vinculados à CDL
+    Usuario.count({ where: { role: 'cliente', cdl_id } }),
+    // Empresas ativas da CDL
+    Usuario.count({ where: { role: 'empresa', cdl_id, status: 'ativo' } }),
+    // Gráfico de barras: compras por mês (criadas vs escaneadas + valor)
+    sequelize.query(`
+      SELECT
+        TO_CHAR(DATE_TRUNC('month', data_cadastro), 'Mon') AS mes,
+        DATE_TRUNC('month', data_cadastro) AS mes_order,
+        COUNT(*) AS criadas,
+        COUNT(CASE WHEN status = 'validada' THEN 1 END) AS escaneadas,
+        COALESCE(SUM(CASE WHEN status = 'validada' THEN valor ELSE 0 END), 0) AS valor
+      FROM compras
+      WHERE empresa_id IN (${idsParam})
+        AND data_cadastro >= NOW() - INTERVAL '12 months'
+      GROUP BY DATE_TRUNC('month', data_cadastro)
+      ORDER BY mes_order DESC
+      LIMIT 12
+    `, { type: sequelize.QueryTypes.SELECT }),
+    // Gráfico de linha: média de dias de retorno por mês (1ª → 2ª compra)
+    sequelize.query(`
+      SELECT
+        TO_CHAR(DATE_TRUNC('month', segunda), 'Mon') AS mes,
+        DATE_TRUNC('month', segunda) AS mes_order,
+        ROUND(AVG(EXTRACT(EPOCH FROM (segunda - primeira)) / 86400)::numeric, 1) AS media_dias
+      FROM (
+        SELECT
+          cliente_id,
+          MIN(validado_em) AS primeira,
+          MIN(CASE WHEN rn > 1 THEN validado_em END) AS segunda
+        FROM (
+          SELECT cliente_id, validado_em,
+                 ROW_NUMBER() OVER (PARTITION BY cliente_id ORDER BY validado_em) AS rn
+          FROM compras
+          WHERE status = 'validada'
+            AND cliente_id IS NOT NULL
+            AND empresa_id IN (${idsParam})
+        ) ranked
+        GROUP BY cliente_id
+        HAVING COUNT(*) >= 2
+      ) tempos
+      WHERE segunda IS NOT NULL
+      GROUP BY DATE_TRUNC('month', segunda)
+      ORDER BY mes_order ASC
+      LIMIT 12
+    `, { type: sequelize.QueryTypes.SELECT }),
+    // Lojas mais ativas por volume de vendas validadas
+    sequelize.query(`
+      SELECT u.nome, ROUND(SUM(c.valor)::numeric, 2) AS volume
+      FROM compras c
+      JOIN usuarios u ON c.empresa_id = u.usuario_id
+      WHERE c.empresa_id IN (${idsParam})
+        AND c.status = 'validada'
+      GROUP BY u.nome
+      ORDER BY volume DESC
+      LIMIT 5
+    `, { type: sequelize.QueryTypes.SELECT })
+  ]);
+
+  const pontosGerados = parseInt(agregados?.pontos_gerados) || 0;
+  const pontosUsados = parseInt(pontosUsadosAgg?.total_pontos_usados) || 0;
+  const valorEscaneadas = parseFloat(agregados?.valor_escaneadas) || 0;
+
+  const valoresTendencia = recorrenciaPorMesResult.map(r => parseFloat(r.media_dias));
+  const tendencia = _calcularTendencia(valoresTendencia);
+  const mediaDiasRetorno = valoresTendencia.length > 0
+    ? parseFloat((valoresTendencia.reduce((acc, v) => acc + v, 0) / valoresTendencia.length).toFixed(1))
+    : null;
+
+  return {
+    cdl_id,
+    resumo_geral: {
+      valor_pontos_gerados: pontosGerados,
+      valor_pontos_usados: pontosUsados,
+      valor_compras_escaneadas: valorEscaneadas,
+      clientes_cadastrados: totalClientes || 0,
+      empresas_cadastradas: totalEmpresas || 0
+    },
+    compras_por_mes: comprasPorMesResult.map(r => ({
+      mes: r.mes,
+      criadas: parseInt(r.criadas),
+      escaneadas: parseInt(r.escaneadas),
+      valor: parseFloat(r.valor)
+    })),
+    saude_pontos: {
+      pontos_gerados: pontosGerados,
+      pontos_usados: pontosUsados
+    },
+    grafico_recorrencia: {
+      media_dias_retorno: mediaDiasRetorno,
+      tendencia,
+      por_mes: recorrenciaPorMesResult.map(r => ({
+        mes: r.mes,
+        media_dias: parseFloat(r.media_dias)
+      }))
+    },
+    lojas_mais_ativas: lojasAtivasResult.map(r => ({
+      nome: r.nome,
+      volume: parseFloat(r.volume)
+    }))
+  };
+}
+
 module.exports = {
   listarCompras,
   listarComprasPorEmpresa,
@@ -502,5 +665,6 @@ module.exports = {
   atualizarCompra,
   excluirCompra,
   estatisticasEmpresa,
-  getBigNumbers
+  getBigNumbers,
+  getGraficosCdl
 };
