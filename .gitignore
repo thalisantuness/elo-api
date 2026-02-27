@@ -4,3 +4,6 @@ node_modules
 .wwebjs_cache
 
 wpp
+
+# Scripts de seed/demo (apenas para uso local)
+scripts/
