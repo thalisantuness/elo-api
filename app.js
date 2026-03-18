@@ -1,57 +1,85 @@
-const express = require("express");
-const cors = require("cors");
-const bodyParser = require("body-parser");
-const sequelize = require("./src/utils/db");
-const routes = require("./src/routes/routes");
-const http = require("http");
-const { Server } = require("socket.io");
-const jwt = require("jsonwebtoken");
-const authConfig = require("./src/config/auth.json");
-const ChatSocketController = require("./src/controllers/chatSocketController");
+const express = require('express');
+
+// CAPTURAR QUALQUER ERRO ANTES DE TUDO
+process.on('uncaughtException', (error) => {
+  console.error('💥💥💥 UNCAUGHT EXCEPTION:', error);
+  console.error(error.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥💥💥 UNHANDLED REJECTION:', reason);
+  process.exit(1);
+});
+
+console.log('🚀 INICIANDO APLICAÇÃO...');
+
+let logger;
+let requestLogger;
+
+try {
+  logger = require('./src/services/logger');
+  console.log('✅ Logger carregado');
+} catch (error) {
+  console.error('❌ Erro ao carregar logger:', error);
+  process.exit(1);
+}
+
+try {
+  requestLogger = require('./src/middleware/requestLogger');
+  console.log('✅ RequestLogger carregado');
+} catch (error) {
+  console.error('❌ Erro ao carregar requestLogger:', error);
+  process.exit(1);
+}
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "*", // Ajustar para o endereço do app React Native em produção
-    methods: ["GET", "POST"],
-  },
+
+// Log de inicialização
+logger.info('Iniciando aplicação', {
+  node_version: process.version,
+  platform: process.platform,
+  memory_limit: process.memoryUsage().heapTotal
 });
 
-app.use(bodyParser.urlencoded({ extended: true, limit: "900mb" }));
-app.use(bodyParser.json({ limit: "900mb" }));
-app.use(cors());
-app.use("/", routes);
-
-// Middleware de autenticação Socket.IO
-io.use((socket, next) => {
-  const token = socket.handshake.auth.token;
-  if (!token) {
-    return next(new Error("Token não fornecido"));
-  }
-  try {
-    const decoded = jwt.verify(token, authConfig.secret);
-    socket.user = decoded; // Armazenar dados do usuário no socket
-    next();
-  } catch (error) {
-    next(new Error("Token inválido"));
-  }
+// Middleware para logar TODAS as requisições
+app.use((req, res, next) => {
+  console.log(`\n📨 REQUISIÇÃO RECEBIDA: ${req.method} ${req.url}`);
+  console.log('Headers:', req.headers);
+  console.log('Body:', req.body);
+  next();
 });
 
-// Passar a instância do io para o ChatSocketController
-const chatSocketController = ChatSocketController(io);
-io.on("connection", chatSocketController.handleSocketConnection);
+// Middlewares
+app.use(express.json({ limit: '10mb' }));
+app.use(requestLogger);
 
-sequelize
-  .sync({ force: false }) // Não dropar tabelas
-  .then(() => {
-    console.log("Modelos sincronizados com o banco de dados");
-  })
-  .catch((error) => {
-    console.error("Erro ao sincronizar modelos com o banco de dados:", error);
-  });
+// Rotas
+try {
+  const routes = require('./src/routes/routes');
+  app.use('/api', routes);
+  console.log('✅ Rotas carregadas');
+} catch (error) {
+  console.error('❌ Erro ao carregar rotas:', error);
+  process.exit(1);
+}
 
-const PORT = 4000;
-server.listen(PORT, () => {
-  console.log(`Servidor web iniciado na porta: ${PORT}`);
+// Rota de teste simples (SEM AUTH)
+app.get('/test', (req, res) => {
+  console.log('✅ Rota /test chamada');
+  res.json({ message: 'Servidor funcionando!' });
 });
+
+const PORT = process.env.PORT || 4000;
+
+const server = app.listen(PORT, () => {
+  console.log(`\n🚀🚀🚀 SERVIDOR RODANDO NA PORTA ${PORT} 🚀🚀🚀`);
+  console.log(`📍 Teste: http://localhost:${PORT}/test`);
+  console.log(`📍 API: http://localhost:${PORT}/api\n`);
+});
+
+server.on('error', (error) => {
+  console.error('💥 ERRO NO SERVIDOR:', error);
+});
+
+console.log('✅ App configurado, aguardando requisições...');
