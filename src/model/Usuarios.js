@@ -1,4 +1,4 @@
-const { Sequelize } = require("sequelize");
+const { Sequelize, DataTypes } = require("sequelize"); // <-- ADICIONE DataTypes AQUI
 const sequelize = require("../utils/db");
 const { Regra } = require("./Regra");
 
@@ -6,13 +6,12 @@ const Usuario = sequelize.define(
   "Usuario",
   {
     usuario_id: {
-      type: Sequelize.INTEGER,
+      type: DataTypes.INTEGER, // <-- Agora funciona
       primaryKey: true,
       autoIncrement: true,
     },
-    // Campo único para vincular qualquer usuário (loja ou cliente) à CDL
     cdl_id: {
-      type: Sequelize.INTEGER,
+      type: DataTypes.INTEGER,
       allowNull: true,
       references: {
         model: "usuarios",
@@ -20,77 +19,112 @@ const Usuario = sequelize.define(
       },
     },
     role: {
-      type: Sequelize.STRING,
+      type: DataTypes.STRING,
       allowNull: false,
       validate: {
-        isIn: [['admin', 'cdl', 'empresa', 'cliente', 'empresa-funcionario']]
-      }
+        isIn: [["admin", "cdl", "empresa", "cliente", "empresa-funcionario"]],
+      },
     },
     nome: {
-      type: Sequelize.STRING,
+      type: DataTypes.STRING,
       allowNull: false,
     },
     telefone: {
-      type: Sequelize.STRING(20),
+      type: DataTypes.STRING(20),
       allowNull: true,
     },
     email: {
-      type: Sequelize.STRING,
+      type: DataTypes.STRING,
       allowNull: false,
       unique: true,
     },
     senha: {
-      type: Sequelize.STRING,
+      type: DataTypes.STRING,
       allowNull: false,
     },
     foto_perfil: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: true,
     },
     cliente_endereco: {
-      type: Sequelize.TEXT,
+      type: DataTypes.TEXT,
       allowNull: true,
     },
     cidade: {
-      type: Sequelize.STRING(100),
+      type: DataTypes.STRING(100),
       allowNull: true,
     },
     estado: {
-      type: Sequelize.STRING(2),
+      type: DataTypes.STRING(2),
       allowNull: true,
     },
     pontos: {
-      type: Sequelize.INTEGER,
+      type: DataTypes.INTEGER,
       allowNull: true,
       defaultValue: 0,
     },
     cnpj: {
-      type: Sequelize.STRING(18),
+      type: DataTypes.STRING(18),
       allowNull: true,
     },
     status: {
-      type: Sequelize.ENUM("ativo", "pendente", "bloqueado"),
+      type: DataTypes.ENUM("ativo", "pendente", "bloqueado"),
       defaultValue: "pendente",
     },
     regra_id: {
-      type: Sequelize.INTEGER,
+      type: DataTypes.INTEGER,
       allowNull: true,
-      references: { model: 'regras', key: 'regra_id' },
-      onUpdate: 'CASCADE',
-      onDelete: 'SET NULL',
+      references: { model: "regras", key: "regra_id" },
+      onUpdate: "CASCADE",
+      onDelete: "SET NULL",
     },
     modalidade_pontuacao: {
-      type: Sequelize.STRING(50),
+      type: DataTypes.STRING(50),
       allowNull: true,
       defaultValue: "regras",
     },
     data_cadastro: {
-      type: Sequelize.DATE,
-      defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
     },
     data_atualizacao: {
-      type: Sequelize.DATE,
-      defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+    },
+    
+    // ========== NOVOS CAMPOS (APENAS UMA VEZ) ==========
+    mp_customer_id: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      comment: "ID do cliente no Mercado Pago",
+    },
+    plano_atual: {
+      type: DataTypes.ENUM("gratuito", "basico", "profissional", "enterprise"),
+      defaultValue: "gratuito",
+    },
+    status_assinatura: {
+      type: DataTypes.ENUM("ativa", "inadimplente", "pendente", "cancelada"),
+      defaultValue: "gratuito",
+    },
+    limite_produtos: {
+      type: DataTypes.INTEGER,
+      defaultValue: 10,
+    },
+    limite_usuarios: {
+      type: DataTypes.INTEGER,
+      defaultValue: 1,
+    },
+    data_expiracao_plano: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    ultimo_pagamento: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    proximo_pagamento: {
+      type: DataTypes.DATE,
+      allowNull: true,
     },
   },
   {
@@ -98,28 +132,28 @@ const Usuario = sequelize.define(
     tableName: "usuarios",
     timestamps: false,
     indexes: [
-      { fields: ['regra_id'] },
-      { fields: ['cdl_id'] },
-      { fields: ['role'] },
-      { fields: ['cidade', 'estado'] }
-    ]
+      { fields: ["regra_id"] },
+      { fields: ["cdl_id"] },
+      { fields: ["role"] },
+      { fields: ["cidade", "estado"] },
+    ],
   }
 );
 
 Usuario.belongsTo(Regra, {
-  foreignKey: 'regra_id',
-  as: 'regra'
+  foreignKey: "regra_id",
+  as: "regra",
 });
 
 // Auto-relacionamento para CDL -> Lojas/Clientes
 Usuario.belongsTo(Usuario, {
-  foreignKey: 'cdl_id',
-  as: 'cdl'
+  foreignKey: "cdl_id",
+  as: "cdl",
 });
 
 Usuario.hasMany(Usuario, {
-  foreignKey: 'cdl_id',
-  as: 'membros'
+  foreignKey: "cdl_id",
+  as: "membros",
 });
 
 module.exports = { Usuario };
