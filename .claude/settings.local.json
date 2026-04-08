@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find 'C:/Users/thali/OneDrive/Área de Trabalho/Cardial codes/3. Truckage/back-truckage/src/main/java/com/elo/api' -type f -name *.java)"
+    ]
+  }
+}
